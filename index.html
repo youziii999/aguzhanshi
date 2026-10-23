@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-<!-- 重生之我是股神 · 单文件版 v3.3 · 构建于 2026-10-24 00:03 · 源码见 stock-game/ -->
+<!-- 重生之我是股神 · 单文件版 v3.4 · 构建于 2026-10-24 00:52 · 源码见 stock-game/ -->
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0b0e13">
@@ -103,13 +103,13 @@ button{font-family:inherit}
 .page{display:none;flex:1 1 auto;min-height:0}
 .page.on{display:block;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch}
 .page[data-page="stock"].on{
-  display:grid;grid-template-columns:288px minmax(0,1fr) 322px;gap:10px;overflow:hidden;
+  display:grid;grid-template-columns:280px minmax(0,1fr) 268px;gap:10px;overflow:hidden;
 }
 .page .left{grid-column:1}
 .page .center{grid-column:2}
 .page .right{grid-column:3}
 /* 侧栏收起（顶栏 ☰ / 面板内「收起」） */
-#app.no-left .page[data-page="stock"].on{grid-template-columns:minmax(0,1fr) 322px}
+#app.no-left .page[data-page="stock"].on{grid-template-columns:minmax(0,1fr) 268px}
 #app.no-left .page .center{grid-column:1}
 #app.no-left .page .right{grid-column:2}
 #app.no-left .left{display:none}
@@ -370,15 +370,15 @@ button{font-family:inherit}
 
 /* ---------- §10 响应式 ---------- */
 @media (max-width:1180px){
-  .page[data-page="stock"].on{grid-template-columns:250px minmax(0,1fr) 300px}
-  #app.no-left .page[data-page="stock"].on{grid-template-columns:minmax(0,1fr) 300px}
+  .page[data-page="stock"].on{grid-template-columns:248px minmax(0,1fr) 246px}
+  #app.no-left .page[data-page="stock"].on{grid-template-columns:minmax(0,1fr) 246px}
   .statbox{display:none}
   .secgrid{grid-template-columns:repeat(4,minmax(0,1fr))}
   .mk-hero{grid-template-columns:1.3fr 1fr 1fr}
 }
 @media (max-width:980px){
-  .page[data-page="stock"].on{grid-template-columns:minmax(0,1fr) 300px}
-  #app.no-left .page[data-page="stock"].on{grid-template-columns:minmax(0,1fr) 300px}
+  .page[data-page="stock"].on{grid-template-columns:minmax(0,1fr) 246px}
+  #app.no-left .page[data-page="stock"].on{grid-template-columns:minmax(0,1fr) 246px}
   .page .center{grid-column:1}
   .page .right{grid-column:2}
   /* 侧栏在窄屏变成侧滑浮层 */
@@ -566,6 +566,60 @@ button{font-family:inherit}
   .lvl .myp{font-size:8px}
 }
 
+/* ---------- §12 个股页：分时图下方紧凑交易条 + 右侧窄盘口（v3.4） ---------- */
+@media (min-width:761px){
+  /* 中栏：图表吃满剩余高度，交易条紧贴图表下方 */
+  .page>.center{display:flex;flex-direction:column;gap:8px}
+  #panelChart{flex:1 1 auto;min-height:0}
+  #panelOrder{flex:0 0 auto}
+  .order.order-h{display:flex;flex-direction:row;align-items:center;gap:6px;padding:9px 10px 2px;flex-wrap:wrap}
+  .order.order-h .seg{flex:0 0 126px}
+  .order.order-h .seg button{padding:8px 0;font-size:13px}
+  .order.order-h .field{flex:1 1 104px;height:34px;min-width:88px;padding:0 8px}
+  .order.order-h .field label{font-size:11px}
+  .order.order-h .field input{font-size:14px}
+  .order.order-h .stepper{flex:0 0 auto}
+  .order.order-h .stepper button{height:34px;padding:0 8px;font-size:11px;white-space:nowrap}
+  .order.order-h .submit{flex:0 0 138px;height:36px;font-size:14px;margin-left:auto}
+}
+.ohint{display:flex;align-items:center;gap:8px;padding:5px 10px 9px;min-width:0}
+.ohint .hint{padding:0;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.ohint .tag{flex:0 0 auto}
+@media (max-width:980px){
+  .order.order-h .stepper{display:none}
+  .order.order-h .submit{flex:0 0 118px}
+}
+@media (max-width:760px){
+  /* 手机顺序：分时图 → 交易条 → 五档盘口 → 持仓 → 消息 */
+  #panelChart{order:1}
+  #panelOrder{order:2}
+  .page>.right .panel{order:3}
+  .order.order-h{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:8px 10px 2px}
+  .order.order-h .seg{grid-column:1/-1}
+  .order.order-h .seg button{padding:8px 0;font-size:13px}
+  .order.order-h .field{flex:none;min-width:0;height:36px}
+  .order.order-h .field label{font-size:11px}
+  .order.order-h .stepper{display:flex;grid-column:1/-1;gap:5px}
+  .order.order-h .stepper button{flex:1;height:32px;padding:0}
+  .order.order-h .submit{grid-column:1/-1;width:100%;height:40px;margin-left:0;flex:none}
+  .ohint{padding:6px 10px 9px;gap:6px}
+  .ohint .hint{font-size:11px}
+}
+@media (max-width:420px){
+  .order.order-h .seg button{font-size:12px;padding:7px 0}
+  .order.order-h .submit{font-size:13px;height:38px}
+  .ohint .hint{font-size:10px}
+}
+@media (min-width:761px) and (max-width:1150px){
+  /* 中间宽度：交易条排成两行，别把「全部」挤到按钮底下 */
+  .order.order-h{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+  .order.order-h .seg{flex:none}
+  .order.order-h .field{flex:none;min-width:0}
+  .order.order-h .stepper{grid-column:1/3;display:flex}
+  .order.order-h .stepper button{flex:1}
+  .order.order-h .submit{grid-column:3;flex:none;width:100%;height:34px;margin-left:0;font-size:13px}
+}
+
 </style>
 </head>
 <body data-page="market">
@@ -575,7 +629,7 @@ button{font-family:inherit}
        顶栏 —— 全站共享，始终显示大盘指数 / 涨跌家数 / 时钟 / 速度
        ============================================================ -->
   <header class="topbar">
-    <div class="brand"><span class="dot"></span>股神<small>SIM</small><i class="ver" id="appVer">v3.3</i></div>
+    <div class="brand"><span class="dot"></span>股神<small>SIM</small><i class="ver" id="appVer">v3.4</i></div>
     <div class="idxbox">
       <span class="v num" id="idxV">3000.00</span>
       <span class="c num" id="idxC">+0.00%</span>
@@ -722,7 +776,7 @@ button{font-family:inherit}
 
     <!-- 中：图表 -->
     <section class="center">
-      <div class="panel">
+      <div class="panel" id="panelChart">
         <div class="quote-hd">
           <button class="backbtn" id="btnBack" title="返回行情页">‹</button>
           <div>
@@ -750,32 +804,21 @@ button{font-family:inherit}
         </div>
         <div id="chartWrap"><canvas id="chart"></canvas></div>
       </div>
-    </section>
 
-    <!-- 右：盘口 / 交易 / 持仓 / 消息 -->
-    <aside class="right">
-      <div class="panel panel-book" id="panelBook">
-        <div class="panel-hd"><b>五档盘口</b><div class="right dim num" id="bookMeta"></div></div>
-        <div class="panel-bd">
-          <div class="book" id="book"></div>
-          <div class="flow" id="flowBox"></div>
-        </div>
-      </div>
-
+      <!-- 交易条：分时图正下方，一行搞定（同花顺分时页的位置） -->
       <div class="panel panel-order" id="panelOrder">
-        <div class="panel-hd"><b>交易</b><div class="right"><span class="tag" id="acctTag">可用 0</span></div></div>
-        <div class="order">
+        <div class="order order-h">
           <div class="seg" id="sideSeg">
             <button data-side="buy" class="on">买入</button>
             <button data-side="sell">卖出</button>
           </div>
-          <div class="field">
-            <label>价格</label>
+          <div class="field f-price">
+            <label>价</label>
             <input id="inpPrice" type="number" inputmode="decimal" step="0.01" value="0.00">
             <span class="unit">元</span>
           </div>
-          <div class="field">
-            <label>数量</label>
+          <div class="field f-qty">
+            <label>量</label>
             <input id="inpQty" type="number" inputmode="numeric" step="100" value="100">
             <span class="unit">股</span>
           </div>
@@ -786,7 +829,18 @@ button{font-family:inherit}
             <button data-q="1">全部</button>
           </div>
           <button class="submit buy" id="btnSubmit">买入</button>
-          <div class="hint" id="orderHint">限价单 · 涨停 0.00 / 跌停 0.00</div>
+        </div>
+        <div class="ohint"><span class="tag" id="acctTag">可用 0</span><span class="hint" id="orderHint">限价单 · 涨停 0.00 / 跌停 0.00</span></div>
+      </div>
+    </section>
+
+    <!-- 右：盘口 / 交易 / 持仓 / 消息 -->
+    <aside class="right">
+      <div class="panel panel-book" id="panelBook">
+        <div class="panel-hd"><b>五档盘口</b><div class="right dim num" id="bookMeta"></div></div>
+        <div class="panel-bd">
+          <div class="book" id="book"></div>
+          <div class="flow" id="flowBox"></div>
         </div>
       </div>
 
@@ -851,16 +905,16 @@ button{font-family:inherit}
         <div class="setrow">
           <div>
             <div class="settt">交易节奏</div>
-            <div class="dim setdd">默认 4 小时（贴合现实）；收盘后休息 30 分钟，可用 ⏭ 直接开盘</div>
+            <div class="dim setdd">默认 1 小时走完一个交易日；收盘后休息 30 分钟，可用 ⏭ 直接开盘</div>
           </div>
         </div>
         <div class="pacerow">
           <div class="seg pace" id="paceSeg">
             <button data-pace="1500">25 分钟</button>
             <button data-pace="3000">50 分钟</button>
-            <button data-pace="3600">1 小时</button>
+            <button data-pace="3600" class="on">1 小时</button>
             <button data-pace="7200">2 小时</button>
-            <button data-pace="14400" class="on">4 小时</button>
+            <button data-pace="14400">4 小时</button>
           </div>
         </div>
         <div class="setrow">
@@ -882,7 +936,7 @@ button{font-family:inherit}
     <div class="mt" id="startTitle">开始游戏</div>
     <div class="md">选一笔启动资金，1 万 ~ 20 万。资金越小，同样的仓位越能影响你的心态。<br>
       <b>点「开始交易」立刻开盘</b>，之后只有两种状态：开盘、收盘休息 30 分钟。休息结束自动开下一天，一天接一天不断循环，不用你点任何东西。<br>
-      节奏默认贴合现实（1 秒 = 1 秒，一天 4 小时）；嫌慢点右上角 5× / 15× / 60×，或者去「我的 → 交易节奏」改。<br>
+      节奏默认 <b>1 小时走完一个交易日</b>；嫌慢点右上角 5× / 15× / 60×，或者去「我的 → 交易节奏」改成 2 小时 / 4 小时（完全贴合现实）。<br>
       手机上玩：用浏览器打开这个 html，「添加到主屏幕」就能全屏当 App 用。</div>
     <div class="mval"><b class="num" id="startVal">100,000</b><span>元</span></div>
     <input type="range" id="startRange" min="10000" max="200000" step="5000" value="100000">
@@ -1013,7 +1067,7 @@ button{font-family:inherit}
     if (m < 120) { h = 9; mi = 30 + m; }
     else if (m < 240) { var x = m - 120; h = 13 + Math.floor(x / 60); mi = x % 60; }
     else { return '15:00'; }
-    if (mi >= 60) { h += 1; mi -= 60; }
+    while (mi >= 60) { h += 1; mi -= 60; }
     return (h < 10 ? '0' + h : h) + ':' + (mi < 10 ? '0' + mi : mi);
   }
   SG.util = {
@@ -3037,7 +3091,7 @@ button{font-family:inherit}
     leftOpen: true,           // 个股页左侧栏是否展开
     rankTab: 'up',            // 行情页榜单当前页签
     startCash: START_CASH,    // 本局启动资金
-    pace: 14400,              // 走完一个交易日要花多少真实秒（14400 = 4 小时，贴合 A 股）
+    pace: 3600,               // 走完一个交易日要花多少真实秒（3600 = 1 小时，用户可改）
     breakLeft: 0,             // 收盘休息剩余（毫秒）
     breakReal: 0,             // 休息倒计时上一次刷新时间
     started: false            // 是否已点过「开始交易」（未开始不落盘，避免刷新跳过选资金）
@@ -3270,7 +3324,7 @@ button{font-family:inherit}
       sel: S.sel, tf: S.tf, page: S.page, filter: S.filter,
       speed: S.speed || 1, lastSpeed: S.lastSpeed || 1,
       sortBy: S.sortBy, sortDir: S.sortDir, rankTab: S.rankTab,
-      startCash: S.startCash, posTab: S.posTab, pace: S.pace || 14400,
+      startCash: S.startCash, posTab: S.posTab, pace: S.pace || 3600,
       breakLeft: S.breakLeft || 0,
       ordSeq: ordSeq, salt: SALT, savedAt: Date.now()
     };
@@ -4136,7 +4190,8 @@ button{font-family:inherit}
         (pnl >= 0 ? '+' : '') + U.fmtMoney(pnl) + '</b></div>' +
       '<div class="acrow"><span>冻结 / 已实现</span><b class="num dim">' + U.fmtMoney(frozen) +
         ' / ' + (a.realized >= 0 ? '+' : '') + U.fmtMoney(a.realized) + '</b></div>';
-    $('acctTag').textContent = '可用 ' + U.fmtMoney(a.cash - frozen);
+    var tag = $('acctTag');
+    if (tag) tag.textContent = '可用 ' + U.fmtMoney(a.cash - frozen);
   }
 
   function renderOrder(S) {
@@ -4567,7 +4622,7 @@ button{font-family:inherit}
   var S = null;
 
   /* 交易节奏：走完 240 个交易分钟要花的真实秒数。用户可在「我的 → 交易节奏」里改。
-     默认 14400 秒 = 完全贴合现实（1 秒 = 1 游戏秒，一个交易日 4 小时）。 */
+     默认 3600 秒 = 1 小时走完一个交易日（用户可在设置里改快或改慢）。 */
   var PACE = [
     { sec: 1500,  label: '25 分钟' },
     { sec: 3000,  label: '50 分钟' },
@@ -4576,12 +4631,12 @@ button{font-family:inherit}
     { sec: 14400, label: '4 小时' }
   ];
   var BREAK = 1800;           // 收盘休息 30 分钟（同样受倍速影响）
-  function paceSec(s) { return s.pace || 14400; }
+  function paceSec(s) { return s.pace || 3600; }
 
   function st() { return S || (S = SG.state.S); }
 
   /* ============================ 区块 A：时间推进 ============================ */
-  /* 1× 下：一个交易分钟 = pace / 240 秒真实时间（默认 4 小时/天 → 每分钟 60 秒） */
+  /* 1× 下：一个交易分钟 = pace / 240 秒真实时间（默认 1 小时/天 → 每分钟 15 秒） */
   function tickMs(s) {
     var per = paceSec(s) * 1000 / 240;
     return Math.max(60, Math.round(per / (s.speed > 0 ? s.speed : 1)));
@@ -4641,7 +4696,7 @@ button{font-family:inherit}
   /* J — 交易节奏（秒/交易日） */
   function setPace(sec) {
     var s = st();
-    s.pace = sec || 14400;
+    s.pace = sec || 3600;
     s.lastReal = 0;
     syncPace();
     schedule();
@@ -5045,7 +5100,7 @@ button{font-family:inherit}
       s.sortDir = saved.sortDir || -1;
       s.posTab = saved.posTab || 'pos';
       s.rankTab = saved.rankTab || 'up';
-      s.pace = saved.pace || 14400;
+      s.pace = saved.pace || 3600;
       s.acct.day = s.m.day;
     }
 

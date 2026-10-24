@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-<!-- 重生之我是股神 · 单文件版 v4.1 · 构建于 2026-10-24 11:39 · 源码见 stock-game/ -->
+<!-- 重生之我是股神 · 单文件版 v4.2 · 构建于 2026-10-24 11:55 · 源码见 stock-game/ -->
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0b0e13">
@@ -460,6 +460,11 @@ button{font-family:inherit}
   .mrow2{grid-template-columns:minmax(0,1fr) repeat(2,minmax(0,auto));gap:8px}
   .mrow2 .mhide{display:none}
 }
+@media (max-width:600px){
+  /* 小屏顶栏放不下这么多按钮：15× 与重开都收起来（重开在「我的 → 游戏设置」） */
+  .speed button[data-s="15"]{display:none}
+  #btnReset{display:none}
+}
 @media (max-width:420px){
   .brand{display:none}
   .topbar{gap:6px;padding:0 8px}
@@ -469,6 +474,9 @@ button{font-family:inherit}
   .speed button{padding:4px 6px;font-size:11px}
   .speed button[data-s="15"]{display:none}
   .iconbtn{width:28px;height:28px}
+  /* 390 宽时按钮太多会溢出，重置入口在「我的 → 游戏设置」里 */
+  #btnReset{display:none}
+  .clock{gap:5px}
   .flow4 .flowcell{padding:4px 6px}
   .flow4 .flowcell span{font-size:9px}
   .flow4 .flowcell b{font-size:11px}
@@ -718,6 +726,7 @@ button{font-family:inherit}
 .wrow{
   display:grid;grid-template-columns:minmax(0,1.5fr) 78px 84px 88px 62px 84px 40px;
   gap:6px;align-items:center;padding:9px 12px;border-bottom:1px solid #1a2129;cursor:pointer;font-size:13px;
+  height:46px;box-sizing:border-box;overflow:hidden;
 }
 .wrow:hover{background:#182029}
 .wrow .w1{display:flex;flex-direction:column;min-width:0}
@@ -896,6 +905,40 @@ button{font-family:inherit}
   .secrow .sr i{font-size:11px}
   .secrow .sr span{font-size:10px}
 }
+/* ---------- §14 手机端手感（触控反馈 / 防误缩 / 滚动惯性） ---------- */
+button,.row,.mrow,.wrow,.trow,.secrow,.tbrow,.clk{cursor:pointer;touch-action:manipulation}
+button,input,select,textarea,.row,.mrow,.wrow,.trow,.secrow{-webkit-user-select:none;user-select:none}
+/* 按下立刻给反馈，别等 click */
+.row:active,.mrow:active,.wrow:active,.trow:active,.secrow:active,.heat .hc:active,
+.tabbar button:active,.seg button:active,.chip:active,.mini:active,.iconbtn:active,
+.btn-submit:active,#btnSubmit:active,.star:active{filter:brightness(1.22)}
+#chart{touch-action:pan-y}
+.listbd,.panel-bd,.secbody,.right,.page{overscroll-behavior:contain}
+@media (max-width:760px){
+  /* iOS 聚焦输入框会被放大：字号必须 >=16px，否则页面会突然缩放 */
+  .searchbar input,.tr-pick select,.field input,#inpPrice,#inpQty,.lh-search{font-size:16px}
+  .listbd,.panel-bd{-webkit-overflow-scrolling:touch}
+  .page{scroll-behavior:auto}
+  /* 弹层改成底部抽屉，拇指够得着 */
+  .modal{align-items:flex-end}
+  .modal .mbox{border-radius:16px 16px 0 0;max-height:88dvh;margin:0;
+    padding-bottom:calc(10px + env(safe-area-inset-bottom))}
+  .mbox.secbox{max-width:100%;width:100%;border-radius:16px 16px 0 0;max-height:88dvh}
+  .tabbar button{padding:8px 0 7px}
+  .tabbar button:active{background:#121a24}
+  /* 点按区放大：★ 和 小按钮至少 32px */
+  .star{min-width:34px;min-height:34px;display:inline-flex;align-items:center;justify-content:center}
+  .mini{min-height:28px;padding:4px 9px}
+  .secclose{position:sticky;bottom:0;background:var(--panel)}
+}
+@media (max-width:420px){
+  .tabbar button{font-size:10px}
+  .tabbar button i{font-size:16px}
+}
+@media (prefers-reduced-motion:reduce){
+  *{transition:none!important;animation:none!important}
+}
+
 </style>
 </head>
 <body data-page="market">
@@ -905,7 +948,7 @@ button{font-family:inherit}
        顶栏 —— 全站共享：三条指数 / 涨跌家数 / 时钟 / 倍速
        ============================================================ -->
   <header class="topbar">
-    <div class="brand"><span class="dot"></span>股神<small>SIM</small><i class="ver" id="appVer">v4.1</i></div>
+    <div class="brand"><span class="dot"></span>股神<small>SIM</small><i class="ver" id="appVer">v4.2</i></div>
     <div class="idxbox">
       <span class="nm">上证</span>
       <span class="v num" id="idxV">3000.00</span>
@@ -3261,7 +3304,11 @@ button{font-family:inherit}
     if (!r.width || !r.height) return;
     dpr = Math.min(2, window.devicePixelRatio || 1);
     W = Math.round(r.width); H = Math.round(r.height);
-    cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+    /* 尺寸没变就别重置画布：canvas.width 赋值会重新分配像素并清屏，切页面时会明显卡一下 */
+    var nw = Math.round(W * dpr), nh = Math.round(H * dpr);
+    if (cv.width !== nw || cv.height !== nh) {
+      cv.width = nw; cv.height = nh;
+    }
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     draw();
   }
@@ -3597,11 +3644,32 @@ button{font-family:inherit}
     ctx.closePath();
   }
 
+  /* 重绘签名：数据没变就不重画（切页面、每帧 refresh 都会调 set，白白重画很费） */
+  var drawKey = '';
+  function sigOf() {
+    var st = S.stock, m = S.market;
+    if (!st) return '';
+    var a = (SG.state && SG.state.S) ? SG.state.S.acct : null, tr = 0, i;
+    if (a && a.trades) {
+      for (i = 0; i < a.trades.length; i++) {
+        if (a.trades[i].code === st.code && a.trades[i].day === (m ? m.day : 0)) tr++;
+      }
+    }
+    var last = (st.hist && st.hist.length) ? st.hist[st.hist.length - 1].c : 0;
+    return [st.code, S.tf, m ? m.day : 0, m ? m.minute : 0, m ? (m.phase || '') : '',
+      st.minutes ? st.minutes.length : 0, st.hist ? st.hist.length : 0, last,
+      st.pc, W, H, tr].join(',');
+  }
+
   SG.chart = {
     attach: attach, resize: resize, draw: draw,
     set: function (stock, tf, market) {
       S.stock = stock; S.tf = tf; S.market = market;
-      if (!W || !H) resize(); else draw();
+      if (!W || !H) { resize(); drawKey = sigOf(); return; }
+      var k = sigOf();
+      if (k === drawKey) return;      // 一模一样就不重画
+      drawKey = k;
+      draw();
     },
     state: S
   };
@@ -4087,6 +4155,31 @@ button{font-family:inherit}
 
   function pct(st) { return (st.pc - st.prevClose) / st.prevClose; }
 
+  /* 虚拟列表窗口：只渲染视口附近的行（行高必须固定，靠上下两个占位 div 撑高度）
+     返回 [起始下标, 结束下标)；滚动时窗口变化，调用方据此重建 DOM。 */
+  function vlist(box, n, rowH, pad) {
+    var top = box ? (box.scrollTop || 0) : 0;
+    var h = (box && box.clientHeight) || 460;
+    pad = (pad == null ? 8 : pad);
+    var s = Math.max(0, Math.floor(top / rowH) - pad);
+    var e = Math.min(n, Math.ceil((top + h) / rowH) + pad);
+    if (e < s) e = s;
+    return [s, e];
+  }
+
+  /* 滚动节流：一帧最多重算一次 */
+  function onScrollThrottled(el, fn) {
+    if (!el) return;
+    var tick = 0;
+    el.addEventListener('scroll', function () {
+      if (tick) return;
+      tick = 1;
+      var raf = (typeof root.requestAnimationFrame === 'function')
+        ? root.requestAnimationFrame : function (f) { return root.setTimeout(f, 16); };
+      raf(function () { tick = 0; fn(); });
+    }, { passive: true });
+  }
+
   /* ============================ 区块 B：全市场统计 ============================ */
   function stats(S) {
     var m = S.m, i, st, p;
@@ -4210,7 +4303,7 @@ button{font-family:inherit}
   }
 
   SG.uiCommon = {
-    $: $, toast: toast, pct: pct,
+    $: $, toast: toast, pct: pct, vlist: vlist, onScrollThrottled: onScrollThrottled,
     stats: stats, sectors: sectors, dist: dist, idx3: idx3, renderTop: renderTop
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = SG;
@@ -4695,7 +4788,7 @@ button{font-family:inherit}
   }
 
   /* ============================ 区块 B：顶部 ============================ */
-  function renderHead(S) {
+  function renderHead(S, arr) {
     var seg = $('wtTabs');
     if (seg) {
       for (var i = 0; i < seg.children.length; i++) {
@@ -4705,37 +4798,40 @@ button{font-family:inherit}
     }
     var box = $('wtStat');
     if (!box) return;
-    var arr = picked(S);
     var up = 0, dn = 0, sum = 0, amt = 0;
-    arr.forEach(function (st) {
-      var p = pctOf(st);
-      sum += p; amt += st.day.amt;
+    for (i = 0; i < arr.length; i++) {
+      var p = pctOf(arr[i]);
+      sum += p; amt += arr[i].day.amt;
       if (p > 0.0004) up++; else if (p < -0.0004) dn++;
-    });
+    }
     var avg = arr.length ? sum / arr.length : 0;
-    box.innerHTML =
+    var html =
       '<div class="wscell"><span>自选</span><b class="num">' + (S.watch || []).length + '</b></div>' +
       '<div class="wscell"><span>' + (fallback(S) ? '全部' : '本页') + '</span><b class="num">' + arr.length + '</b></div>' +
       '<div class="wscell"><span>上涨</span><b class="num up">' + up + '</b></div>' +
       '<div class="wscell"><span>下跌</span><b class="num down">' + dn + '</b></div>' +
       '<div class="wscell"><span>均涨</span><b class="num ' + U.cls(avg) + '">' + U.fmtPct(avg) + '</b></div>' +
       '<div class="wscell"><span>成交</span><b class="num">' + U.fmtMoney(amt) + '</b></div>';
+    if (box.dataset.html !== html) { box.dataset.html = html; box.innerHTML = html; }
   }
 
-  /* ============================ 区块 C：列表 ============================ */
-  var cache = {}, sig = '';
+  /* ============================ 区块 C：列表（虚拟列表） ============================ */
+  var cache = {}, sig = '', RH = 46, RPAD = 8, rowsAll = [];
 
-  function renderList(S) {
-    var arr = picked(S);
+  function renderList(S, arr) {
     var box = $('wtList');
-    if (!$('wtCount')) return;
+    if (!$('wtCount') || !box) return;
     $('wtCount').textContent = arr.length + ' 只';
-    var now = [S.watchTab, S.search || '', S.sortBy, S.sortDir, S.m.day, (S.watch || []).join(','), fallback(S) ? 'fb' : ''].join('|');
-    var i;
+    rowsAll = arr;
+    var win = C.vlist(box, arr.length, RH, RPAD), s0 = win[0], s1 = win[1];
+    var now = [S.watchTab, S.search || '', S.sortBy, S.sortDir, S.m.day,
+      (S.watch || []).join(','), fallback(S) ? 'fb' : '', s0, s1].join('|');
+    var i, off = 0;
     if (now !== sig) {
       sig = now; cache = {};
       var html = '';
-      for (i = 0; i < arr.length; i++) {
+      if (s0 > 0) { html += '<div class="vpad" style="height:' + (s0 * RH) + 'px"></div>'; off = 1; }
+      for (i = s0; i < s1; i++) {
         var st0 = arr[i];
         html += '<div class="wrow clk" data-code="' + st0.code + '">' +
           '<div class="w1"><b>' + st0.name + '</b><span>' + st0.code + ' · ' + secName(st0.sector) + '</span></div>' +
@@ -4743,46 +4839,59 @@ button{font-family:inherit}
           '<div class="w4 num">0</div><div class="w5 num">0.00%</div><div class="w6 num">0</div>' +
           '<button class="star" data-star="' + st0.code + '">☆</button></div>';
       }
+      if (s1 < arr.length) html += '<div class="vpad" style="height:' + ((arr.length - s1) * RH) + 'px"></div>';
       box.innerHTML = html || '<div class="empty">' +
         ((S.watchTab || 'watch') === 'watch' ? '还没有自选股<br>去行情页点 ☆ 加几只进来' : '没有匹配的股票') + '</div>';
-      Array.prototype.forEach.call(box.children, function (el, k) {
-        var st1 = arr[k];
-        if (!st1 || !el.children.length || !el.querySelector) return;
-        cache[st1.code] = {
-          el: el, price: el.children[1], chg: el.children[2],
+      for (i = s0; i < s1; i++) {
+        var el = box.children[off + i - s0];
+        if (!el || !el.children.length) continue;
+        cache[arr[i].code] = {
+          el: el, price: el.children[1], chgEl: el.children[2],
           amt: el.children[3], turn: el.children[4], flow: el.children[5],
-          star: el.querySelector('[data-star]')
+          star: el.querySelector ? el.querySelector('[data-star]') : null
         };
-      });
+      }
     }
-    for (i = 0; i < arr.length; i++) {
+    /* 只刷新窗口内的行，且值没变就不碰 DOM */
+    for (i = s0; i < s1; i++) {
       var st = arr[i], c = cache[st.code];
       if (!c) continue;
-      var p = pctOf(st);
-      c.price.textContent = (st.pc / 100).toFixed(2);
-      c.price.className = 'w2 num ' + U.cls(p);
-      c.chg.textContent = U.fmtPct(p);
-      c.chg.className = 'w3 num ' + U.cls(p);
-      c.amt.textContent = U.fmtMoney(st.day.amt);
-      c.turn.textContent = (st.turnoverPct || 0).toFixed(2) + '%';
+      var p = pctOf(st), cls = U.cls(p);
+      var pxs = (st.pc / 100).toFixed(2);
+      if (c.pxs !== pxs) { c.pxs = pxs; c.price.textContent = pxs; }
+      if (c.pc !== cls) { c.pc = cls; c.price.className = 'w2 num ' + cls; }
+      var chg = U.fmtPct(p);
+      if (c.chgTxt !== chg) { c.chgTxt = chg; c.chgEl.textContent = chg; }
+      if (c.chgc !== cls) { c.chgc = cls; c.chgEl.className = 'w3 num ' + cls; }
+      var amt = U.fmtMoney(st.day.amt);
+      if (c.amtTxt !== amt) { c.amtTxt = amt; c.amt.textContent = amt; }
+      var turn = (st.turnoverPct || 0).toFixed(2) + '%';
+      if (c.turnTxt !== turn) { c.turnTxt = turn; c.turn.textContent = turn; }
       var fl = (st.flow.xl || 0) + (st.flow.l || 0);
-      c.flow.textContent = (fl >= 0 ? '+' : '') + U.fmtMoney(fl);
-      c.flow.className = 'w6 num ' + U.cls(fl);
+      var flTxt = (fl >= 0 ? '+' : '') + U.fmtMoney(fl);
+      if (c.flTxt !== flTxt) { c.flTxt = flTxt; c.flow.textContent = flTxt; }
+      var fcls = U.cls(fl);
+      if (c.fcls !== fcls) { c.fcls = fcls; c.flow.className = 'w6 num ' + fcls; }
       if (c.star) {
         var on = (S.watch || []).indexOf(st.code) >= 0;
-        c.star.textContent = on ? '★' : '☆';
-        c.star.className = 'star' + (on ? ' on' : '');
+        if (c.on !== on) { c.on = on; c.star.textContent = on ? '★' : '☆'; c.star.className = 'star' + (on ? ' on' : ''); }
       }
     }
   }
 
   function render(S) {
-    renderHead(S);
-    renderList(S);
+    var arr = picked(S);          // 排序只做一次，头部和列表共用
+    renderHead(S, arr);
+    renderList(S, arr);
   }
 
   /* ============================ 区块 D：入口 ============================ */
   function init() {
+    /* 虚拟列表：滚动只换窗口，不重排全表 */
+    C.onScrollThrottled($('wtList'), function () {
+      var S = SG.state.S;
+      if (S && S.page === 'watch') render(S);
+    });
     var se = $('wtSearch');
     if (se) se.addEventListener('input', function () {
       SG.state.S.search = this.value || '';
@@ -4838,7 +4947,6 @@ button{font-family:inherit}
   SG.router.register('watch', SG.pageWatch);
   if (typeof module !== 'undefined' && module.exports) module.exports = SG;
 })(typeof globalThis !== 'undefined' ? globalThis : this);
-
 </script>
 <script>
 /* ===== js/page-stock.js ===== */
@@ -5305,8 +5413,7 @@ button{font-family:inherit}
     render: render,
     init: init,
     onShow: function (S) {
-      // 刚切回来时画布可能还是 0 尺寸，重新量一次再画
-      SG.chart.resize();
+      // 刚切回来时画布可能还是 0 尺寸，resize 会重新量；尺寸没变就直接跳过重绘
       SG.chart.set(S.stock, S.tf, S.m);
     }
   });
@@ -5670,15 +5777,25 @@ button{font-family:inherit}
   }
 
   /* ============================ 区块 A：资产总览 ============================ */
-  function drawCurve(S, v) {
+  var curveSize = '', curveSig = '';
+  function drawCurve(S, v, force) {
     var cv = $('meCurve');
     if (!cv || !cv.getContext) return;
     var r = cv.getBoundingClientRect ? cv.getBoundingClientRect() : null;
     var w = r ? r.width : 0, h = r ? r.height : 0;
     if (!w || !h) return;
     var dpr = Math.min(2, (root.devicePixelRatio || 1));
-    cv.width = Math.round(w * dpr);
-    cv.height = Math.round(h * dpr);
+    /* 尺寸没变就不要改 canvas.width —— 那会重新分配画布并整块重绘 */
+    var size = w + 'x' + h + '@' + dpr;
+    if (size !== curveSize) {
+      curveSize = size;
+      cv.width = Math.round(w * dpr);
+      cv.height = Math.round(h * dpr);
+    } else if (!force) {
+      var sk = size + '|' + v.total.toFixed(2) + '|' + (S.acct.equityLog || []).length + '|' + S.m.day;
+      if (sk === curveSig) return;
+      curveSig = sk;
+    }
     var ctx = cv.getContext('2d');
     if (!ctx) return;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -5772,7 +5889,8 @@ button{font-family:inherit}
       html += '<div class="mcell"><div class="k">' + it[0] + '</div>' +
         '<div class="v num ' + it[2] + '">' + it[1] + '</div></div>';
     });
-    $('meCards').innerHTML = html;
+    var box = $('meCards');
+    if (box.dataset.html !== html) { box.dataset.html = html; box.innerHTML = html; }
   }
 
   /* ============================ 区块 C：持仓 ============================ */
@@ -5795,10 +5913,12 @@ button{font-family:inherit}
           '<div class="dim" style="font-size:10px">' + U.fmtPct(pcv) + '</div></div>' +
         '</div>';
     });
-    $('mePos').innerHTML = n
+    var full = n
       ? ('<div class="mrow2 head"><div>名称 / 持仓</div><div class="r mhide">现价</div>' +
          '<div class="r">市值</div><div class="r">盈亏</div></div>' + html)
       : '<div class="empty">空仓中<br>去个股页挑一只买入</div>';
+    var box = $('mePos');
+    if (box.dataset.html !== full) { box.dataset.html = full; box.innerHTML = full; }
     $('mePosMeta').textContent = n ? n + ' 只持仓' : '';
   }
 
@@ -5825,7 +5945,8 @@ button{font-family:inherit}
         '<div class="r num">' + U.fmtMoneyFull(t.amt) + '</div>' +
         '</div>';
     });
-    $('meTrades').innerHTML = html || '<div class="empty">今天还没有成交</div>';
+    var tb = $('meTrades'), tv = html || '<div class="empty">今天还没有成交</div>';
+    if (tb.dataset.html !== tv) { tb.dataset.html = tv; tb.innerHTML = tv; }
     var stat = '累计 ' + n + ' 笔 · 买 ' + U.fmtMoneyFull(buyAmt) + ' · 卖 ' + U.fmtMoneyFull(sellAmt) +
       ' · 费 ' + U.fmtMoneyFull(fee);
     $('meTradeMeta').textContent = n ? stat : '';

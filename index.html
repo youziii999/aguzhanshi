@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-<!-- 重生之我是股神 · 单文件版 v4.2 · 构建于 2026-10-24 11:55 · 源码见 stock-game/ -->
+<!-- 重生之我是股神 · 单文件版 v4.3 · 构建于 2026-10-24 12:24 · 源码见 stock-game/ -->
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0b0e13">
@@ -948,7 +948,7 @@ button,input,select,textarea,.row,.mrow,.wrow,.trow,.secrow{-webkit-user-select:
        顶栏 —— 全站共享：三条指数 / 涨跌家数 / 时钟 / 倍速
        ============================================================ -->
   <header class="topbar">
-    <div class="brand"><span class="dot"></span>股神<small>SIM</small><i class="ver" id="appVer">v4.2</i></div>
+    <div class="brand"><span class="dot"></span>股神<small>SIM</small><i class="ver" id="appVer">v4.3</i></div>
     <div class="idxbox">
       <span class="nm">上证</span>
       <span class="v num" id="idxV">3000.00</span>
@@ -1914,7 +1914,7 @@ button,input,select,textarea,.row,.mrow,.wrow,.trow,.secrow{-webkit-user-select:
     o.q -= q; o.filled += q;
     if (record) {
       recordTrade(st, pc, q, o.side, { m: m ? m.minute : 0, ch: chOfValue(q * pc / 100), player: true });
-      if (m && st.ticks && st.ticks.length) st.ticks[st.ticks.length - 1].my = 1;
+      if (st.lastTick) st.lastTick.my = 1;
     }
     if (fills) fills.push([pc, q]);
     else if (st.onPlayerFill) st.onPlayerFill(st, o, pc, q);
@@ -1943,33 +1943,68 @@ button,input,select,textarea,.row,.mrow,.wrow,.trow,.secrow{-webkit-user-select:
     return Math.max(CFG.LOT * 300, Math.round(q / CFG.LOT) * CFG.LOT);
   }
 
+  /* 档位对象池：盘口每个微步都重建，池化后不再给 GC 添 16 个对象/票/微步 */
+  /* 每档的衰减系数是常量，提前算好：原来是每个微步每只票 16 次 Math.pow */
+  var DECAYP = [];
+  (function () { for (var i = 0; i < 64; i++) DECAYP[i] = Math.pow(CFG.DECAY, i); })();
+  function lvSlot(st, i) {
+    var pool = st._lvp || (st._lvp = []);
+    var o = pool[i];
+    if (!o) o = pool[i] = { pc: 0, q: 0, n: 0, pl: [], seal: 0 };
+    if (!o.pl) o.pl = [];
+    o.pl.length = 0;
+    o.q = 0; o.seal = 0;
+    return o;
+  }
+  /* 玩家挂到盘口之外的价位时，临时插一档（复用 8 个备用槽） */
+  function lvExtra(st) {
+    var i = st._lx || 0;
+    st._lx = i + 1;
+    var o = lvSlot(st, CFG.LEVELS * 2 + (i % 8));
+    o.n = 1;
+    return o;
+  }
+
   function buildBook(st, rnd) {
-    var bids = [], asks = [], i, pc, tk = st.tickPc, base = firstLevelValue(st);
+    var bk = st.book || (st.book = { bids: [], asks: [] });
+    var bids = bk.bids, asks = bk.asks, i, pc, tk = st.tickPc, base = firstLevelValue(st);
+    bids.length = 0; asks.length = 0;
     /* 涨停：买一就是涨停价上那堆封单，卖盘空（没人卖）；
        跌停反过来。这样五档上能直接看到「几万手封单」压在那里。 */
     if (st.pc >= st.limitUp) {
-      bids.push({ pc: st.limitUp, q: Math.max(CFG.LOT, Math.round((st.sealBuy || 0) / CFG.LOT) * CFG.LOT), n: 9, seal: 1 });
-      st.book = { bids: bids, asks: asks };
+      var b0 = lvSlot(st, 0);
+      b0.pc = st.limitUp;
+      b0.q = Math.max(CFG.LOT, Math.round((st.sealBuy || 0) / CFG.LOT) * CFG.LOT);
+      b0.n = 9; b0.seal = 1;
+      bids.push(b0);
       injectPlayer(st);
       return;
     }
     if (st.pc <= st.limitDown) {
-      asks.push({ pc: st.limitDown, q: Math.max(CFG.LOT, Math.round((st.sealSell || 0) / CFG.LOT) * CFG.LOT), n: 9, seal: 1 });
-      st.book = { bids: bids, asks: asks };
+      var a0 = lvSlot(st, 0);
+      a0.pc = st.limitDown;
+      a0.q = Math.max(CFG.LOT, Math.round((st.sealSell || 0) / CFG.LOT) * CFG.LOT);
+      a0.n = 9; a0.seal = 1;
+      asks.push(a0);
       injectPlayer(st);
       return;
     }
     for (i = 0; i < CFG.LEVELS; i++) {
-      var fb = Math.pow(CFG.DECAY, i) * (0.55 + rnd() * 0.9);
-      var fa = Math.pow(CFG.DECAY, i) * (0.55 + rnd() * 0.9);
+      var fb = DECAYP[i] * (0.55 + rnd() * 0.9);
+      var fa = DECAYP[i] * (0.55 + rnd() * 0.9);
       var qb = Math.max(100, Math.round(base * fb / st.pc * 100));
       var qa = Math.max(100, Math.round(base * fa / st.pc * 100));
       pc = st.pc - (i + 1) * tk;
-      if (pc > 0) bids.push({ pc: pc, q: qb, n: 1 + Math.floor(rnd() * 9) });
+      if (pc > 0) {
+        var lb = lvSlot(st, i);
+        lb.pc = pc; lb.q = qb; lb.n = 1 + Math.floor(rnd() * 9);
+        bids.push(lb);
+      }
       pc = st.pc + (i + 1) * tk;
-      asks.push({ pc: pc, q: qa, n: 1 + Math.floor(rnd() * 9) });
+      var la = lvSlot(st, CFG.LEVELS + i);
+      la.pc = pc; la.q = qa; la.n = 1 + Math.floor(rnd() * 9);
+      asks.push(la);
     }
-    st.book = { bids: bids, asks: asks };
     injectPlayer(st);
   }
 
@@ -1987,7 +2022,8 @@ button,input,select,textarea,.row,.mrow,.wrow,.trow,.secrow{-webkit-user-select:
       var lv = null, k;
       for (k = 0; k < arr.length; k++) { if (arr[k].pc === o.pc) { lv = arr[k]; break; } }
       if (!lv) {
-        lv = { pc: o.pc, q: 0, n: 1, pl: [] };
+        lv = lvExtra(st);
+        lv.pc = o.pc;
         arr.push(lv);
         (function (sgn) {
           arr.sort(function (a, b) { return sgn > 0 ? b.pc - a.pc : a.pc - b.pc; });
@@ -2044,8 +2080,12 @@ button,input,select,textarea,.row,.mrow,.wrow,.trow,.secrow{-webkit-user-select:
     st.mv += q;
     st.ma += q * pc / 100;
     st.mn += 1;
-    st.ticks.push({ m: meta ? meta.m : 0, pc: pc, q: q, side: side });
-    if (st.ticks.length > 60) st.ticks.shift();
+    var ti = st.ti || 0, tk = st.ticks[ti];
+    if (!tk) tk = st.ticks[ti] = { m: 0, pc: 0, q: 0, side: 0, my: 0 };
+    tk.m = meta ? meta.m : 0; tk.pc = pc; tk.q = q; tk.side = side; tk.my = 0;
+    st.ti = (ti + 1) % 60;
+    if ((st.tn || 0) < 60) st.tn = (st.tn || 0) + 1;
+    st.lastTick = tk;
     if (meta && meta.ch) {
       var val = q * pc / 100;
       var ch = meta.ch;
@@ -2161,7 +2201,8 @@ button,input,select,textarea,.row,.mrow,.wrow,.trow,.secrow{-webkit-user-select:
     // ---- 先吃盘口（挂单被吃掉多少，五档就少多少） ----
     execute(st, side, qty, limitPc, meta);
     // ---- 压力：订单量占「一分钟平均成交量」的比例 → 推动力（tick 为单位） ----
-    var flow = qty / perMinQty(st);
+    var pmq = perMinQty(st);
+    var flow = qty / pmq;
     var soft = Math.max(0.25, st.depthMul * st.liq);
     st.press += side * flow * CFG.MOVE_PER_FLOW / soft;
     if (CFG.DEBUG && DBG) { if (side > 0) DBG.pUp = (DBG.pUp || 0) + flow; else DBG.pDn = (DBG.pDn || 0) + flow; }
@@ -2177,7 +2218,7 @@ button,input,select,textarea,.row,.mrow,.wrow,.trow,.secrow{-webkit-user-select:
     var npc = st.pc;
     /* 只有「鲸鱼单」（一次吃下超过 1.2 分钟的量）才产生滑点：
        它把盘口吃穿几档，成交价就得落到那一档。普通小单不额外跳价。 */
-    if (st.lastExecPc != null && qty >= perMinQty(st) * 1.2) {
+    if (st.lastExecPc != null && qty >= pmq * 1.2) {
       npc = side > 0 ? Math.max(npc, Math.min(st.lastExecPc, st.limitUp))
                      : Math.min(npc, Math.max(st.lastExecPc, st.limitDown));
     }
@@ -2192,33 +2233,35 @@ button,input,select,textarea,.row,.mrow,.wrow,.trow,.secrow{-webkit-user-select:
   /* ============================================================
    * 三、四类资金 + 操盘手计划
    * ============================================================ */
-  function context(m, st) {
+  /* 热路径：ctx / dir 都复用同一块对象，避免每个微步给 324 只票造上万个小对象（GC 抖动） */
+  function context(m, st, out) {
     var mins = st.minutes, n = mins.length;
     var c0 = n >= 1 ? mins[n - 1].c : st.prevClose;
     var c5 = n >= 5 ? mins[n - 5].c : st.prevClose;
     var c20 = n >= 20 ? mins[n - 20].c : st.prevClose;
-    return {
-      ret1: st.pc / Math.max(1, c0) - 1,
-      ret5: st.pc / Math.max(1, c5) - 1,
-      ret20: st.pc / Math.max(1, c20) - 1,
-      gap: (st.fair - st.pc) / st.pc,
-      sent: m.sentiment,
-      secRet: m.sectorRet[st.sector] || 0,
-      secFlow: m.sectorFlow[st.sector] || 0,
-      mkt: m.mktFlow || 0,
-      hot: st.hot || 0,
-      dayRet: st.pc / st.prevClose - 1
-    };
+    out.ret1 = st.pc / Math.max(1, c0) - 1;
+    out.ret5 = st.pc / Math.max(1, c5) - 1;
+    out.ret20 = st.pc / Math.max(1, c20) - 1;
+    out.gap = (st.fair - st.pc) / st.pc;
+    out.sent = m.sentiment;
+    out.secRet = m.sectorRet[st.sector] || 0;
+    out.secFlow = m.sectorFlow[st.sector] || 0;
+    out.mkt = m.mktFlow || 0;
+    out.hot = st.hot || 0;
+    out.dayRet = st.pc / st.prevClose - 1;
+    return out;
   }
 
   /* 每只票、每类资金都有一条自己的情绪游走（bias），所以资金不会整齐划一 */
   function biasStep(st, normal) {
-    ['s', 'm', 'l', 'xl'].forEach(function (k) {
-      st.bias[k] = U.clamp(st.bias[k] * 0.82 + normal() * 0.55, -2.2, 2.2);
-    });
+    var b = st.bias;
+    b.s = U.clamp(b.s * 0.82 + normal() * 0.55, -2.2, 2.2);
+    b.m = U.clamp(b.m * 0.82 + normal() * 0.55, -2.2, 2.2);
+    b.l = U.clamp(b.l * 0.82 + normal() * 0.55, -2.2, 2.2);
+    b.xl = U.clamp(b.xl * 0.82 + normal() * 0.55, -2.2, 2.2);
   }
 
-  function directions(m, st, ctx, normal) {
+  function directions(m, st, ctx, normal, out) {
     var ck = CFG.CORR_K, b = st.bias;
     var rg = (m.regime || 0) * CFG.REGIME_W;
     var seek = U.clamp((st.targetRet - ctx.dayRet) * 6.5, -0.5, 0.5) * CFG.SEEK_W;
@@ -2242,7 +2285,8 @@ button,input,select,textarea,.row,.mrow,.wrow,.trow,.secrow{-webkit-user-select:
       var av = U.clamp((-dr - 0.045) * 16, 0, 1.25);
       dS -= av * 0.90; dM -= av * 0.85; dL -= av * 0.70; dXL -= av * 0.45;
     }
-    return { s: dS, m: dM, l: dL, xl: dXL };
+    out.s = dS; out.m = dM; out.l = dL; out.xl = dXL;
+    return out;
   }
 
   /* ---- 操盘手法：方向偏置 / 盘口厚度 / 单量倍率 / 持续时间 ---- */
@@ -2443,8 +2487,10 @@ button,input,select,textarea,.row,.mrow,.wrow,.trow,.secrow{-webkit-user-select:
       var fv = beta * CFG.MKT_VOL, sv = CFG.SEC_VOL * 0.85, iv = CFG.IDIO_VOL;
       var fx = normal() * fv + normal() * sv + normal() * iv;
       st.fair *= Math.exp(fx - (fv * fv + sv * sv + iv * iv) * 0.5);
-      var ctx = context(m, st);
-      var dir = directions(m, st, ctx, normal);
+      var ctx = st.ctx || (st.ctx = {});
+      context(m, st, ctx);
+      var dir = st.dir || (st.dir = {});
+      directions(m, st, ctx, normal, dir);
       for (key in plan.dir) {
         if (dir[key] != null) dir[key] = U.clamp(dir[key] + plan.dir[key] * 0.75 * CFG.PLAN_W, -1.15, 1.15);
       }
@@ -2462,32 +2508,39 @@ button,input,select,textarea,.row,.mrow,.wrow,.trow,.secrow{-webkit-user-select:
       var totalLots = Math.max(1, Math.floor(budget / lotVal));
       var wantN = st.ordRate / CFG.MICRO * uShape * noise * plan.size;
       var nOrd = U.clamp(Math.round(wantN), 2, Math.min(CFG.MAX_ORDERS_PER_STEP, totalLots));
-      var orders = [];
+      /* 订单对象走对象池：这批对象每微步都要重建，是 GC 最大的来源 */
+      var ordPool = st._op || (st._op = []);
+      var orders = st._ol || (st._ol = []);
+      orders.length = 0;
       var avgLots = totalLots / nOrd;
       for (i = 0; i < nOrd; i++) {
         var ch = pickCohort(rnd);
         var size = avgLots * ch.lots * Math.exp(ch.sigma * normal() * 0.85);
-        orders.push({ ch: ch.key, amt: Math.max(1, size) });
+        var ob = ordPool[i];
+        if (!ob) ob = ordPool[i] = { ch: '', amt: 0, lots: 0, side: 0, meta: { m: 0, ch: '' } };
+        ob.ch = ch.key;
+        ob.amt = Math.max(1, size);
+        ob.lots = Math.max(1, Math.round(ob.amt));
+        orders.push(ob);
       }
-      var lotsArr = [], sumL = 0;
-      for (i = 0; i < nOrd; i++) { var L0 = Math.max(1, Math.round(orders[i].amt)); lotsArr.push(L0); sumL += L0; }
+      var sumL = 0;
+      for (i = 0; i < nOrd; i++) sumL += orders[i].lots;
       var guard = 0, bi;
       while (sumL > totalLots && guard++ < 400) {
         bi = -1; var bv = 1;
-        for (i = 0; i < nOrd; i++) if (lotsArr[i] > bv) { bv = lotsArr[i]; bi = i; }
+        for (i = 0; i < nOrd; i++) if (orders[i].lots > bv) { bv = orders[i].lots; bi = i; }
         if (bi < 0) break;
-        lotsArr[bi]--; sumL--;
+        orders[bi].lots--; sumL--;
       }
       while (sumL < totalLots && guard++ < 400) {
         bi = 0;
         for (i = 1; i < nOrd; i++) if (orders[i].amt > orders[bi].amt) bi = i;
-        lotsArr[bi]++; sumL++;
+        orders[bi].lots++; sumL++;
       }
       /* 每一笔单自己去掷骰子：p = 0.5 + 方向偏置/2。
          早先用「整组按比例取整」会有小样本伪影（一组只有 1 单时全被压到卖方向上），
          会让大单方向系统性偏斜，这里改成逐单独立判定。 */
       for (i = 0; i < nOrd; i++) {
-        orders[i].lots = lotsArr[i];
         var dd = U.clamp(dir[orders[i].ch], -1, 1);
         if (st.pc >= st.limitUp) dd = Math.max(dd, 0.85);
         if (st.pc <= st.limitDown) dd = Math.min(dd, -0.85);
@@ -2499,14 +2552,18 @@ button,input,select,textarea,.row,.mrow,.wrow,.trow,.secrow{-webkit-user-select:
         var tmp = orders[i]; orders[i] = orders[j]; orders[j] = tmp;
       }
       for (i = 0; i < orders.length; i++) {
-        hit(st, orders[i].side, orders[i].lots * CFG.LOT, null, { m: t, ch: orders[i].ch });
+        var oi = orders[i];
+        oi.meta.m = t; oi.meta.ch = oi.ch;
+        hit(st, oi.side, oi.lots * CFG.LOT, null, oi.meta);
       }
       /* 闪崩进行中：机构每微步都在不计成本地砸，直到打穿跌停 */
       if (st.crashRun && t < st.crashRun) {
         st.panic = Math.max(st.panic, 0.95);
         if (st.pc > st.limitDown) {
           var dq = Math.round(perMinQty(st) * (2.2 + rnd() * 2.2) / CFG.LOT) * CFG.LOT;
-          hit(st, -1, Math.max(CFG.LOT, dq), null, { m: t, ch: 'xl' });
+          if (!st._md) st._md = { m: 0, ch: 'xl' };
+          st._md.m = t;
+          hit(st, -1, Math.max(CFG.LOT, dq), null, st._md);
         }
       }
       // 扫单 / 砸盘：一笔吃掉一整分钟的筹码，价格瞬间跳一截
@@ -2515,7 +2572,10 @@ button,input,select,textarea,.row,.mrow,.wrow,.trow,.secrow{-webkit-user-select:
       if (st.pc < st.limitUp && st.pc > st.limitDown && rnd() < sweepP) {
         var sweepDir = st.plan === 'dump' || st.plan === 'dist' ? -1 : st.plan === 'markup' || st.plan === 'seal' ? 1 : (rnd() < 0.5 ? 1 : -1);
         var sweepQty = Math.round(perMinQty(st) * (0.35 + rnd() * 0.9) / CFG.LOT) * CFG.LOT;
-        var _p0 = st.pc; hit(st, sweepDir, Math.max(CFG.LOT, sweepQty), null, { m: t, ch: sweepDir > 0 ? 'l' : 'xl' }); if (DBG && DBG.sw) { if (sweepDir > 0) { DBG.sw.u++; DBG.sw.tu += st.pc - _p0; } else { DBG.sw.d++; DBG.sw.td += _p0 - st.pc; } }
+        var _p0 = st.pc;
+        if (!st._ms) st._ms = { m: 0, ch: 'l' };
+        st._ms.m = t; st._ms.ch = sweepDir > 0 ? 'l' : 'xl';
+        hit(st, sweepDir, Math.max(CFG.LOT, sweepQty), null, st._ms); if (DBG && DBG.sw) { if (sweepDir > 0) { DBG.sw.u++; DBG.sw.tu += st.pc - _p0; } else { DBG.sw.d++; DBG.sw.td += _p0 - st.pc; } }
       }
       playerTick(m, st, t);
       if (st.pc >= st.limitUp && !st.noReseal) enterBoard(st, rnd());
@@ -2828,15 +2888,19 @@ button,input,select,textarea,.row,.mrow,.wrow,.trow,.secrow{-webkit-user-select:
     var r5 = m.indexValue / Math.max(1, m.indexPrevClose) - 1;
     m.sentiment = U.clamp(m.sentiment * 0.94 + r5 * 2.2 + m.newsSent * 0.16, -1, 1);
     m.newsSent *= 0.985;
-    D.SECTORS.forEach(function (s) {
-      var sum = 0, n = 0;
-      for (var i = 0; i < m.stocks.length; i++) {
-        var st = m.stocks[i];
-        if (st.sector !== s.id) continue;
-        sum += st.pc / st.prevClose - 1; n++;
-      }
-      m.sectorRet[s.id] = n ? sum / n : 0;
-    });
+    /* 一次遍历累加：原来是「18 个板块 × 324 只票」的双循环，每步 5832 次判断 */
+    var sums = m._secSum || (m._secSum = {}), cnts = m._secCnt || (m._secCnt = {});
+    var s0;
+    for (s0 = 0; s0 < D.SECTORS.length; s0++) { sums[D.SECTORS[s0].id] = 0; cnts[D.SECTORS[s0].id] = 0; }
+    for (s0 = 0; s0 < m.stocks.length; s0++) {
+      var q = m.stocks[s0];
+      sums[q.sector] += q.pc / q.prevClose - 1;
+      cnts[q.sector] += 1;
+    }
+    for (s0 = 0; s0 < D.SECTORS.length; s0++) {
+      var sid2 = D.SECTORS[s0].id;
+      m.sectorRet[sid2] = cnts[sid2] ? sums[sid2] / cnts[sid2] : 0;
+    }
   }
 
   function newStock(def) {
@@ -2971,7 +3035,7 @@ button,input,select,textarea,.row,.mrow,.wrow,.trow,.secrow{-webkit-user-select:
       st.flow = { xl: 0, l: 0, m: 0, s: 0 };
       st.xlNet = 0; st.boardBroken = false;
       st.flowMin = { xl: 0, l: 0, m: 0, s: 0 };
-      st.minutes = []; st.ticks = []; st.porders = [];   /* A 股：委托当日有效，收盘全部作废 */
+      st.minutes = []; st.ticks = []; st.ti = 0; st.tn = 0; st.lastTick = null; st.porders = [];   /* A 股：委托当日有效，收盘全部作废 */
       st.mv = 0; st.ma = 0; st.mn = 0;
       st.mo = st.pc; st.mh = st.pc; st.ml = st.pc;
       st.press = 0; st.hot = 0; st.onBoard = false; st.boardMode = 'none'; st.brokeBoard = false; st.boardAt = null; st.noReseal = false;
@@ -3012,9 +3076,10 @@ button,input,select,textarea,.row,.mrow,.wrow,.trow,.secrow{-webkit-user-select:
     if (m.phase !== 'trading') return;
     var rnd = m.rnd, normal = m.normal, t = m.minute;
     m.mktFlow = U.clamp(m.mktFlow * 0.945 + normal() * 0.26, -3, 3);
-    D.SECTORS.forEach(function (s) {
-      m.sectorFlow[s.id] = U.clamp(m.sectorFlow[s.id] * 0.93 + normal() * 0.30 + m.mktFlow * 0.22, -3.5, 3.5);
-    });
+    for (var si = 0; si < D.SECTORS.length; si++) {
+      var sid = D.SECTORS[si].id;
+      m.sectorFlow[sid] = U.clamp(m.sectorFlow[sid] * 0.93 + normal() * 0.30 + m.mktFlow * 0.22, -3.5, 3.5);
+    }
     tickPending(m, rnd, t);
     for (var i = 0; i < m.stocks.length; i++) stepStock(m, m.stocks[i], rnd, normal, t);
     computeIndex(m);
@@ -3169,6 +3234,13 @@ button,input,select,textarea,.row,.mrow,.wrow,.trow,.secrow{-webkit-user-select:
     return n;
   }
 
+  /* 逐笔成交按时间顺序取出（内部是环形缓冲，长度固定 60，靠 st.ti 记录写指针） */
+  function tapeOf(st) {
+    var n = st.tn || 0, cap = 60, out = [], i, idx;
+    for (i = 0; i < n; i++) { idx = (st.ti - n + i + cap * 2) % cap; out.push(st.ticks[idx]); }
+    return out;
+  }
+
   function statsOf(m) {
     var up = 0, dn = 0, flat = 0, lu = 0, ld = 0, amt = 0, flow = { xl: 0, l: 0, m: 0, s: 0 };
     for (var i = 0; i < m.stocks.length; i++) {
@@ -3194,9 +3266,11 @@ button,input,select,textarea,.row,.mrow,.wrow,.trow,.secrow{-webkit-user-select:
       arr.push([s.code, s.prevClose, Math.round(s.fair), Math.round(s.fairClose || s.pc),
         s.sealDays || 0, s.oneWord ? 1 : 0]);
       base = s.baseHistLen || CFG.HISTORY_DAYS;
-      if (s.hist.length > base) {
+      /* 只存最近 24 个交易日的日线：不封顶的话存档会随天数无限变大（每天全市场 324 根） */
+      var from = Math.max(base, s.hist.length - 24);
+      if (s.hist.length > from) {
         var h = [];
-        for (k = base; k < s.hist.length; k++) { b = s.hist[k]; h.push(b.o, b.h, b.l, b.c, b.v); }
+        for (k = from; k < s.hist.length; k++) { b = s.hist[k]; h.push(b.o, b.h, b.l, b.c, b.v); }
         hist[s.code] = h;
       }
     }
@@ -3259,7 +3333,7 @@ button,input,select,textarea,.row,.mrow,.wrow,.trow,.secrow{-webkit-user-select:
     CFG: CFG, PLAN: PLAN, setSTATS: function (o) { STATS = o; },
     createMarket: createMarket, buildHistory: buildHistory,
     openDay: openDay, step: step, endDay: endDay,
-    submit: submit, cancel: cancel, statsOf: statsOf, computeIndex: computeIndex,
+    submit: submit, cancel: cancel, statsOf: statsOf, computeIndex: computeIndex, tapeOf: tapeOf,
     cents: cents, yuan: yuan, perMinQty: perMinQty,
     setPlan: setPlan, startRandomPlan: startRandomPlan,
     snapshot: snapshot, restore: restore,
@@ -4155,11 +4229,34 @@ button,input,select,textarea,.row,.mrow,.wrow,.trow,.secrow{-webkit-user-select:
 
   function pct(st) { return (st.pc - st.prevClose) / st.prevClose; }
 
+  /* 元素尺寸缓存：每帧读 getBoundingClientRect / clientHeight 会强制同步布局
+     （浏览器必须先把上一次改的样式全部算完）。这里用 ResizeObserver 只在尺寸真变时更新。 */
+  function boxSize(el) {
+    if (!el) return { w: 0, h: 0 };
+    var c = el.__sz;
+    if (c) return c;
+    var r = el.getBoundingClientRect ? el.getBoundingClientRect() : null;
+    c = el.__sz = {
+      w: r ? r.width : (el.clientWidth || 0),
+      h: r ? r.height : (el.clientHeight || 0)
+    };
+    if (typeof root.ResizeObserver === 'function') {
+      try {
+        new root.ResizeObserver(function (list) {
+          var b = list[0] && list[0].contentRect;
+          if (b) el.__sz = { w: b.width, h: b.height };
+        }).observe(el);
+      } catch (e) { /* 老浏览器：退回直读 */ }
+    }
+    return c;
+  }
+  function invalidateSize(el) { if (el) el.__sz = null; }
+
   /* 虚拟列表窗口：只渲染视口附近的行（行高必须固定，靠上下两个占位 div 撑高度）
      返回 [起始下标, 结束下标)；滚动时窗口变化，调用方据此重建 DOM。 */
   function vlist(box, n, rowH, pad) {
     var top = box ? (box.scrollTop || 0) : 0;
-    var h = (box && box.clientHeight) || 460;
+    var h = (box && boxSize(box).h) || 460;
     pad = (pad == null ? 8 : pad);
     var s = Math.max(0, Math.floor(top / rowH) - pad);
     var e = Math.min(n, Math.ceil((top + h) / rowH) + pad);
@@ -4303,6 +4400,7 @@ button,input,select,textarea,.row,.mrow,.wrow,.trow,.secrow{-webkit-user-select:
   }
 
   SG.uiCommon = {
+    boxSize: boxSize, invalidateSize: invalidateSize,
     $: $, toast: toast, pct: pct, vlist: vlist, onScrollThrottled: onScrollThrottled,
     stats: stats, sectors: sectors, dist: dist, idx3: idx3, renderTop: renderTop
   };
@@ -4350,8 +4448,8 @@ button,input,select,textarea,.row,.mrow,.wrow,.trow,.secrow{-webkit-user-select:
   function drawSpark(S) {
     var cv = $('idxSpark');
     if (!cv || !cv.getContext) return;
-    var rect = cv.getBoundingClientRect();
-    var W = Math.round(rect.width), H = Math.round(rect.height);
+    var sz = C.boxSize(cv);
+    var W = Math.round(sz.w), H = Math.round(sz.h);
     if (!W || !H) return;
     var dpr = Math.min(2, root.devicePixelRatio || 1);
     if (cv.width !== Math.round(W * dpr) || cv.height !== Math.round(H * dpr)) {
@@ -4998,7 +5096,7 @@ button,input,select,textarea,.row,.mrow,.wrow,.trow,.secrow{-webkit-user-select:
 
   function listWindow(box, n) {
     var top = box ? (box.scrollTop || 0) : 0;
-    var h = (box && box.clientHeight) || 420;
+    var h = (box && SG.uiCommon.boxSize(box).h) || 420;
     var s = Math.max(0, Math.floor(top / RH) - RPAD);
     var e = Math.min(n, Math.ceil((top + h) / RH) + RPAD);
     if (e < s) e = s;
@@ -5051,8 +5149,12 @@ button,input,select,textarea,.row,.mrow,.wrow,.trow,.secrow{-webkit-user-select:
       }
     }
     var curRow = rowCache[S.sel];
-    if (curRow && S.autoScroll && !box.dataset.pinned && box.clientHeight) {
-      var top = curRow.el.offsetTop - box.clientHeight / 2;
+    var bh = box && SG.uiCommon.boxSize(box).h;
+    if (curRow && S.autoScroll && !box.dataset.pinned && bh) {
+      /* 虚拟列表行高固定 + 上方 vpad，所以直接按序号算 offsetTop，不用读 offsetTop（那会强制布局） */
+      var idxSel = 0;
+      for (var q1 = 0; q1 < list.length; q1++) { if (list[q1].code === S.sel) { idxSel = q1; break; } }
+      var top = idxSel * RH - bh / 2;
       if (Math.abs(box.scrollTop - top) > 160) box.scrollTop = Math.max(0, top);
     }
   }
@@ -5132,7 +5234,9 @@ button,input,select,textarea,.row,.mrow,.wrow,.trow,.secrow{-webkit-user-select:
 
   /* ============================ 区块 C：盘口 / 逐笔 ============================ */
   function renderTape(S) {
-    var st = S.stock, arr = (st.ticks || []).slice().reverse(), html = '';
+    var st = S.stock;
+    var raw = (SG.engine && SG.engine.tapeOf) ? SG.engine.tapeOf(st) : (st.ticks || []);
+    var arr = raw.slice().reverse(), html = '';
     var n = Math.min(arr.length, 40);
     for (var i = 0; i < n; i++) {
       var t = arr[i];
@@ -5781,8 +5885,8 @@ button,input,select,textarea,.row,.mrow,.wrow,.trow,.secrow{-webkit-user-select:
   function drawCurve(S, v, force) {
     var cv = $('meCurve');
     if (!cv || !cv.getContext) return;
-    var r = cv.getBoundingClientRect ? cv.getBoundingClientRect() : null;
-    var w = r ? r.width : 0, h = r ? r.height : 0;
+    var sz = (SG.uiCommon && SG.uiCommon.boxSize) ? SG.uiCommon.boxSize(cv) : null;
+    var w = sz ? sz.w : 0, h = sz ? sz.h : 0;
     if (!w || !h) return;
     var dpr = Math.min(2, (root.devicePixelRatio || 1));
     /* 尺寸没变就不要改 canvas.width —— 那会重新分配画布并整块重绘 */
@@ -6069,6 +6173,14 @@ button,input,select,textarea,.row,.mrow,.wrow,.trow,.secrow{-webkit-user-select:
   function advance() {
     var s = st(), m = s.m, now = Date.now();
     if (!m) return;
+    /* 标签页在后台：不推进行情、不重绘界面。后台继续跑 60 倍速是电脑发热的头号原因，
+       而且用户看不见。回到前台时从「现在」重新计时，不会突然补跑一大堆。 */
+    if (typeof document !== 'undefined' && document.hidden) {
+      s.lastReal = 0;
+      s.breakReal = now;
+      schedule();
+      return;
+    }
     if (m.phase !== 'trading') { breakTick(); schedule(); return; }
     var ms = tickMs(s);
     if (!s.lastReal) s.lastReal = now;

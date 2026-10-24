@@ -429,3 +429,25 @@ stock-game/
 
 ### 截图
 `shots/v46-tape-5-390.png`（手机，默认 5 笔 + 展开按钮）、`shots/v46-tape-60-390.png`（展开 60 笔 + 收起）、`shots/v46-tape-1440.png`（桌面右栏逐笔 60 笔）。
+
+---
+
+## 二十二、v4.7 改了什么（逐笔只看大单 / 行情页回顶部）
+
+| 需求 | 做法 | 位置 |
+| --- | --- | --- |
+| 逐笔成交只看大单 | 逐笔面板头改成独立工具条：`只看大单`（≥200 手，1 手=100 股）、`展开全部 / 收起`、右侧实时笔数（`大单 19 笔` / `60 笔`）；筛选状态存在 `S.tapeBig`，换股票也保持；大单在「全部」模式下数量加粗（`.tape-row.big`），不用开筛选也能一眼看到 | `index.html` `#tapeTools/#tapeBig/#tapeCount`、`js/page-stock.js` `renderTape`（`BIG_LOT=20000`）、`js/state.js` `S.tapeBig`、`css/styles.css` `.tape-tools/.tape-toggle.on/.tape-row.big` |
+| 行情页回顶部 | 手机端行情页滑过 480px 后右下角出现圆形 `↑`（`position:fixed`，在底部 tabbar 上方，避让 `safe-area-inset-bottom`）；点击平滑回顶、到顶自动隐藏；按钮放在 `.page[data-page=market]` 内部，切页时随页面一起隐藏；桌面（≥761px）CSS 直接不显示 | `index.html` `#mkTop`、`js/page-market.js` `init()`（`C.onScrollThrottled`）、`css/styles.css` `§16 .totop` |
+
+### 实测（headless Edge 390×844、dpr3、CPU 4× 节流）
+| 检查项 | 结果 |
+| --- | --- |
+| 行情页滑到 1400px | 按钮出现（`class=totop on`） |
+| 点回顶部 | `scrollTop 1400 → 0`，按钮消失 |
+| 逐笔切到「逐笔成交」页签 | 工具条显示，`60 笔` |
+| 点「只看大单」 | 变成 `大单 19 笔`，最小成交 216 手（阈值 200 手） |
+| 展开大单 | 19 行全部显示，按钮变 `收起` |
+| 桌面 1440 | 回顶部按钮 `display:none`，逐笔工具条正常 |
+
+### 截图
+`shots/v47-top-390.png`（手机行情页滑到中部，右下角回顶部）、`shots/v47-big-390.png`（手机逐笔只显示大单 19 笔）、`shots/v47-tape-1440.png`（桌面逐笔工具条）。

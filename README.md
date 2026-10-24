@@ -282,3 +282,29 @@ stock-game/
 | 顺手修的 bug | `util.minuteLabel(100)` 之前输出 `10:70`（只折了一次进位），现在正确显示 `11:10`；顶栏时钟、委托提示、消息时间都受影响 |
 | 测试 | `test/struct.js`（id 引用 + 标签闭合）新增；dom-smoke / SG_SINGLE / play.js / load.js 全绿 |
 | 打包 | `node stock-game/build-single.js 3.4` → `aguzhanshi.html` 233.0KB；同步 `E:\aguzhanshi.html`；`node deploy/gh-update.js` 推到 GitHub Pages |
+
+## 十五、v4.0 改版（仿东财 / 同花顺 IA）
+
+这一版是**界面重做**，底层引擎（订单流撮合、324 只票、消息、龙虎榜、存档）完全没动，只是把信息架构换成东财/同花顺的样子。
+
+| 页面 | 内容 | 状态 |
+| --- | --- | --- |
+| 行情 | 三指数卡（上证 / 权重 / 中盘，带迷你走势）+ 涨跌家数 + 资金流向四档 + **板块热力图** + 涨跌分布 + 今日榜单（涨幅/跌幅/成交额/涨停板/龙虎榜）+ 全市场列表（搜索 + 排序） | 可玩 |
+| 自选 | 搜索（代码/名称）+ 我的自选 / 全部股票 页签 + ★ 加自选（写进存档）+ 可排序 | 可玩 |
+| 个股 | 报价头加 ★、分时/1/5/15/30/60 分/日周月 K、右栏盘口页签（**五档盘口 / 逐笔成交**）、买卖表单、持仓委托成交、消息面 | 可玩 |
+| 交易 | 资产条（总资产/盈亏/可用/冻结/持仓市值/已实现）+ 选股下单 + 五档盘口 + 持仓/委托/成交 + 交易规则卡 | 可玩 |
+| 我的 | 总资产 + 净值曲线 + 账户明细 + 持仓 + 成交 + 游戏设置（资金/节奏/重置） | 可玩 |
+
+手机端：底部 5 个 tab（行情/自选/个股/交易/我的），页面单列堆叠；交易页自动重排成 资产 → 下单 → 五档 → 持仓 → 交易规则。
+
+### 引擎新增（为了这三个页面）
+- `computeIndex` 同时算 `idxLg`（权重，按流通市值前 50 只）/ `idxMd`（中盘，51~150 只），都锚在昨收上，读档重放不受影响；`createMarket` 给每只票打 `st.tier`（lg/md/sm）。
+- 逐笔成交直接用现成的 `st.ticks`（`{m,pc,q,side}`，玩家成交打 `my=1`），没改引擎记账。
+
+### 新增 / 改动的文件
+- 新：`js/page-watch.js`（自选）、`js/page-trade.js`（交易）、`css/styles.css` §13（v4 全部新样式）
+- 重写：`js/page-market.js`、`index.html`（5 页外壳 + 5 tab）、`js/ui-common.js`（`idx3()` + 顶栏三指数）
+- 小改：`js/state.js`（`watch` / `search` / `watchTab` / `tradeTab` + `toggleWatch` / `isWatched`）、`js/page-stock.js`（★、盘口页签、逐笔）、`js/app.js`（新页深链 `page=watch|trade`、读档恢复自选）、`build-single.js`（13 个 js）
+
+### 测试
+`node test/struct.js`（id 引用 + 标签闭合）、`node test/dom-smoke.js`（五页切换，0 处异常）、`SG_SINGLE=1 node test/dom-smoke.js`、`node test/play.js`（12 天不变量成立）、`node test/load.js`（读档 768ms / 324 只价格一致）。

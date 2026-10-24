@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-<!-- 重生之我是股神 · 单文件版 v4.3 · 构建于 2026-10-24 12:24 · 源码见 stock-game/ -->
+<!-- 重生之我是股神 · 单文件版 v4.4 · 构建于 2026-10-24 12:51 · 源码见 stock-game/ -->
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0b0e13">
@@ -88,6 +88,10 @@ button{font-family:inherit}
 .posrow .qbar i{display:block;height:100%;background:var(--accent);transition:width .25s}
 /* 盘口里属于玩家自己的那一档 */
 .lvl.has-mine{background:rgba(240,185,11,.08);box-shadow:inset 0 0 0 1px rgba(240,185,11,.35)}
+/* 固定五档的占位行（涨停卖盘空 / 跌停买盘空） */
+.lvl.empty{opacity:.5}
+.lvl.empty .pr,.lvl.empty .qt{color:var(--dim2);
+  }
 
 /* 页面切换条 */
 .tabbar{flex:0 0 auto;display:flex;gap:6px;padding:0 2px}
@@ -659,6 +663,10 @@ button{font-family:inherit}
 .i3 b{font-size:20px;font-weight:700;letter-spacing:-.5px;line-height:1.2;white-space:nowrap}
 .i3 i{font-style:normal;font-size:12px;font-weight:600}
 .i3.on{background:#181f28;box-shadow:inset 0 -2px 0 var(--accent)}
+.i3{cursor:pointer;transition:background .12s}
+.i3:hover{background:#1b232d}
+.i3 .i3go{font-style:normal;font-size:10px;color:var(--dim2);opacity:.85;margin-left:2px}
+.i3.on .i3go{color:var(--accent);opacity:1}
 #idxSpark{display:block;width:100%;height:74px}
 
 /* 板块热力 */
@@ -772,6 +780,11 @@ button{font-family:inherit}
 .tbrow.ask .tbp{color:#0ecb81}
 .tbrow.bid .tbp{color:#f6465d}
 .tbrow .tbq{text-align:right;color:var(--dim)}
+.tbrow.empty{opacity:.55}
+.tbrow.empty .tbp,.tbrow.empty .tbq{color:var(--dim2)}
+.tr-mini .card-hd{padding-bottom:4px}
+.tr-mini canvas{display:block;width:100%;height:132px}
+@media (max-width:760px){ .tr-mini canvas{height:112px} }
 .tbmid{display:flex;justify-content:space-between;align-items:baseline;padding:5px 12px;margin:3px 0;
   border-top:1px solid var(--line);border-bottom:1px solid var(--line);font-size:16px;font-weight:700}
 .tbmid .tbm{font-size:12px;font-weight:500}
@@ -785,9 +798,10 @@ button{font-family:inherit}
   .tr{grid-template-columns:minmax(0,1fr);grid-template-rows:none}
   .tr-acct{grid-column:1;order:1}
   .tr-order{order:2}
-  .tr-col-r .tr-quote{order:3}
-  .tr-col-r .tr-pos{order:4;min-height:0}
-  .tr-tips{order:5}
+  .tr-mini{order:3}
+  .tr-col-r .tr-quote{order:4}
+  .tr-col-r .tr-pos{order:5;min-height:0}
+  .tr-tips{order:6}
 }
 /* 交易页左栏「交易规则」小卡 */
 .tr-tips{flex:0 0 auto}
@@ -883,9 +897,9 @@ button{font-family:inherit}
 /* ===== 板块成分股弹窗 ===== */
 .mbox.secbox{max-width:520px;max-height:82dvh;padding:0;gap:0;overflow:hidden}
 .secbox .mt{padding:14px 16px 6px;font-size:16px}
-.secmeta{display:flex;align-items:baseline;gap:8px;padding:0 16px 10px;border-bottom:1px solid var(--line);font-size:12px;color:var(--dim)}
-.secmeta span{font-size:15px;font-weight:700}
-.secmeta i{font-style:normal;color:var(--dim)}
+.secmeta{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 8px;padding:0 16px 10px;border-bottom:1px solid var(--line);font-size:12px;color:var(--dim)}
+.secmeta span{font-size:15px;font-weight:700;flex:0 0 auto}
+.secmeta i{font-style:normal;color:var(--dim);flex:1 1 100%;line-height:1.5}
 .secbody{flex:1 1 auto;overflow-y:auto;min-height:0}
 .secrow{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:10px;padding:9px 16px;border-bottom:1px solid rgba(255,255,255,.04);cursor:pointer}
 .secrow:active,.secrow:hover{background:rgba(255,255,255,.045)}
@@ -948,7 +962,7 @@ button,input,select,textarea,.row,.mrow,.wrow,.trow,.secrow{-webkit-user-select:
        顶栏 —— 全站共享：三条指数 / 涨跌家数 / 时钟 / 倍速
        ============================================================ -->
   <header class="topbar">
-    <div class="brand"><span class="dot"></span>股神<small>SIM</small><i class="ver" id="appVer">v4.3</i></div>
+    <div class="brand"><span class="dot"></span>股神<small>SIM</small><i class="ver" id="appVer">v4.4</i></div>
     <div class="idxbox">
       <span class="nm">上证</span>
       <span class="v num" id="idxV">3000.00</span>
@@ -1009,18 +1023,18 @@ button,input,select,textarea,.row,.mrow,.wrow,.trow,.secrow{-webkit-user-select:
       <section class="card idxcard">
         <div class="card-hd"><b>大盘指数</b><span class="dim">按当前进度实时计算</span></div>
         <div class="idx3">
-          <div class="i3 on">
-            <span>上证指数</span>
+          <div class="i3 on" data-idx="sh" title="点开看成分股">
+            <span>上证指数 <em class="i3go">成分股 ›</em></span>
             <b class="num" id="mkIdx">3000.00</b>
             <i class="num" id="mkChg">+0.00%</i>
           </div>
-          <div class="i3">
-            <span>权重指数</span>
+          <div class="i3" data-idx="lg" title="点开看成分股">
+            <span>权重指数 <em class="i3go">成分股 ›</em></span>
             <b class="num" id="mkIdx2">0.00</b>
             <i class="num" id="mkChg2">+0.00%</i>
           </div>
-          <div class="i3">
-            <span>中盘指数</span>
+          <div class="i3" data-idx="md" title="点开看成分股">
+            <span>中盘指数 <em class="i3go">成分股 ›</em></span>
             <b class="num" id="mkIdx3">0.00</b>
             <i class="num" id="mkChg3">+0.00%</i>
           </div>
@@ -1269,6 +1283,11 @@ button,input,select,textarea,.row,.mrow,.wrow,.trow,.secrow{-webkit-user-select:
           <button class="submit buy" id="trSubmit">买入</button>
         </div>
         <div class="ohint"><span class="tag" id="trTag">可用 0</span><span class="hint" id="trHint">--</span></div>
+      </section>
+
+      <section class="card tr-mini">
+        <div class="card-hd"><b>分时走势</b><span class="dim" id="trMiniMeta">--</span></div>
+        <canvas id="trChart"></canvas>
       </section>
 
       <section class="card tr-tips">
@@ -1972,20 +1991,37 @@ button,input,select,textarea,.row,.mrow,.wrow,.trow,.secrow{-webkit-user-select:
     /* 涨停：买一就是涨停价上那堆封单，卖盘空（没人卖）；
        跌停反过来。这样五档上能直接看到「几万手封单」压在那里。 */
     if (st.pc >= st.limitUp) {
-      var b0 = lvSlot(st, 0);
-      b0.pc = st.limitUp;
-      b0.q = Math.max(CFG.LOT, Math.round((st.sealBuy || 0) / CFG.LOT) * CFG.LOT);
-      b0.n = 9; b0.seal = 1;
-      bids.push(b0);
+      /* 涨停：买一挂的是封单（巨量），买二~买五还有排队等回落的跟风单；
+         卖盘没人卖（空），五档里显示「—」。这样看起来和真实 A 股涨停盘口一样。 */
+      var sealQ = Math.max(CFG.LOT, Math.round((st.sealBuy || 0) / CFG.LOT) * CFG.LOT);
+      for (i = 0; i < CFG.LEVELS; i++) {
+        var b0 = lvSlot(st, i);
+        b0.pc = st.limitUp - i * tk;
+        if (i === 0) { b0.q = sealQ; b0.n = 9; b0.seal = 1; }
+        else {
+          var fq = sealQ * (0.26 / i) * (0.7 + rnd() * 0.7);
+          b0.q = Math.max(CFG.LOT, Math.round(fq / CFG.LOT) * CFG.LOT);
+          b0.n = 1 + Math.floor(i * 2 + rnd() * 6);
+        }
+        bids.push(b0);
+      }
       injectPlayer(st);
       return;
     }
     if (st.pc <= st.limitDown) {
-      var a0 = lvSlot(st, 0);
-      a0.pc = st.limitDown;
-      a0.q = Math.max(CFG.LOT, Math.round((st.sealSell || 0) / CFG.LOT) * CFG.LOT);
-      a0.n = 9; a0.seal = 1;
-      asks.push(a0);
+      /* 跌停：卖一挂着巨量砸单，卖二~卖五排队；买盘空（没人接）。 */
+      var sealS = Math.max(CFG.LOT, Math.round((st.sealSell || 0) / CFG.LOT) * CFG.LOT);
+      for (i = 0; i < CFG.LEVELS; i++) {
+        var a0 = lvSlot(st, CFG.LEVELS + i);
+        a0.pc = st.limitDown + i * tk;
+        if (i === 0) { a0.q = sealS; a0.n = 9; a0.seal = 1; }
+        else {
+          var fq2 = sealS * (0.24 / i) * (0.7 + rnd() * 0.7);
+          a0.q = Math.max(CFG.LOT, Math.round(fq2 / CFG.LOT) * CFG.LOT);
+          a0.n = 1 + Math.floor(i * 2 + rnd() * 6);
+        }
+        asks.push(a0);
+      }
       injectPlayer(st);
       return;
     }
@@ -2929,6 +2965,40 @@ button,input,select,textarea,.row,.mrow,.wrow,.trow,.secrow{-webkit-user-select:
     return st;
   }
 
+  /* 三条指数的成分股划分（只影响展示与指数加权，不影响撮合）：
+     - 上证指数：全市场 324 只（和真实 A 股一样，上证综指包含沪市全部个股）
+     - 权重指数：市值前 40 只，再把科创板(688)里市值最大的几只补进来（科创板龙头必须在权重里），
+                 最后按市值补齐到 60 只
+     - 中盘指数：剩下的按市值再取 130 只（科创/创业板的中小票基本都在这里）
+     - 其余算小盘，只用于内部归档，不上指数 */
+  function capOf(st) { return st.shares * st.prevClose / 100; }   // 流通市值（元）
+  function assignTiers(m) {
+    var arr = m.stocks.slice().sort(function (a, b) { return capOf(b) - capOf(a); });
+    var i, st, cnt = 0, LG = 60, MD = 130, md = 0, star = 0;
+    for (i = 0; i < arr.length; i++) arr[i].tier = 'sm';
+    for (i = 0; i < 40 && i < arr.length; i++) {
+      arr[i].tier = 'lg'; cnt++;
+      if (arr[i].code.slice(0, 3) === '688') star++;
+    }
+    /* 科创板龙头保证在权重里：前 40 只里不够 8 只，就从 688 里按市值补（>= 300 亿） */
+    for (i = 0; i < arr.length && star < 8; i++) {
+      st = arr[i];
+      if (st.tier === 'lg' || st.code.slice(0, 3) !== '688') continue;
+      if (capOf(st) < 3e10) break;
+      st.tier = 'lg'; cnt++; star++;
+    }
+    for (i = 0; i < arr.length && cnt < LG; i++) { if (arr[i].tier !== 'lg') { arr[i].tier = 'lg'; cnt++; } }
+    for (i = 0; i < arr.length && md < MD; i++) { if (arr[i].tier !== 'lg') { arr[i].tier = 'md'; md++; } }
+    m.tierN = { lg: cnt, md: md, sm: arr.length - cnt - md, star: star };
+  }
+
+  /* 取某个指数的成分股：sh = 全市场 / lg = 权重 / md = 中盘 */
+  function indexMembers(m, key) {
+    if (!m || !m.stocks) return [];
+    if (key === 'sh') return m.stocks;
+    return m.stocks.filter(function (s) { return s.tier === key; });
+  }
+
   function createMarket(opts) {
     opts = opts || {};
     var seed = opts.seed || 20251023;
@@ -2949,9 +3019,7 @@ button,input,select,textarea,.row,.mrow,.wrow,.trow,.secrow{-webkit-user-select:
       m.stockByCode[st.code] = st;
     });
     buildHistory(m.stocks, rnd, normal);
-    /* 按流通市值分三档，权重 / 中盘子指数用得到（只用于展示，不影响撮合） */
-    m.stocks.slice().sort(function (a, b) { return b.shares * b.prevClose - a.shares * a.prevClose; })
-      .forEach(function (st, k) { st.tier = k < 50 ? 'lg' : (k < 150 ? 'md' : 'sm'); });
+    assignTiers(m);
     /* 历史长度的分界线：以后每天新加的 K 线存档时只存这一段 */
     m.stocks.forEach(function (st) { st.baseHistLen = st.hist.length; });
     m.stocks.forEach(function (st) {
@@ -3337,6 +3405,7 @@ button,input,select,textarea,.row,.mrow,.wrow,.trow,.secrow{-webkit-user-select:
     cents: cents, yuan: yuan, perMinQty: perMinQty,
     setPlan: setPlan, startRandomPlan: startRandomPlan,
     snapshot: snapshot, restore: restore,
+    assignTiers: assignTiers, indexMembers: indexMembers,
     setDBG: function (o) { DBG = o; }, getDBG: function () { return DBG; }
   };
 })(typeof globalThis !== 'undefined' ? globalThis : this);
@@ -4592,6 +4661,18 @@ button,input,select,textarea,.row,.mrow,.wrow,.trow,.secrow{-webkit-user-select:
     return arr;
   }
 
+  /* 弹窗里的成分股行（板块 / 指数共用） */
+  function rowsHtml(arr) {
+    return arr.map(function (st) {
+      var p2 = pctOf(st);
+      return '<div class="secrow" data-code="' + st.code + '">' +
+        '<div class="sl"><b>' + st.name + '</b><i class="dim">' + st.code + ' · ' + secName(st.sector) + '</i></div>' +
+        '<div class="sr"><b class="num ' + U.cls(p2) + '">' + (st.pc / 100).toFixed(2) + '</b>' +
+        '<i class="num ' + U.cls(p2) + '">' + U.fmtPct(p2) + '</i>' +
+        '<span class="num dim">' + U.fmtMoney(st.day.amt) + '</span></div></div>';
+    }).join('');
+  }
+
   function openSec(id) {
     var S = SG.state.S, box = $('secModal');
     if (!box) return;
@@ -4603,14 +4684,34 @@ button,input,select,textarea,.row,.mrow,.wrow,.trow,.secrow{-webkit-user-select:
     $('secMeta').innerHTML = '<span class="' + U.cls(sec ? sec.chg : 0) + '">' +
       (sec ? U.fmtPct(sec.chg) : '全市场') + '</span>' +
       '<i>' + arr.length + ' 只 · 上涨 ' + up + ' · 成交 ' + U.fmtMoney(amt) + '</i>';
-    $('secBody').innerHTML = arr.map(function (st) {
-      var p2 = pctOf(st);
-      return '<div class="secrow" data-code="' + st.code + '">' +
-        '<div class="sl"><b>' + st.name + '</b><i class="dim">' + st.code + ' · ' + secName(st.sector) + '</i></div>' +
-        '<div class="sr"><b class="num ' + U.cls(p2) + '">' + (st.pc / 100).toFixed(2) + '</b>' +
-        '<i class="num ' + U.cls(p2) + '">' + U.fmtPct(p2) + '</i>' +
-        '<span class="num dim">' + U.fmtMoney(st.day.amt) + '</span></div></div>';
-    }).join('');
+    $('secBody').innerHTML = rowsHtml(arr);
+    box.classList.add('on');
+  }
+
+  /* 点指数卡：弹出该指数的成分股（深证/同花顺那种「点指数看成分股」） */
+  function openIdx(key) {
+    var S = SG.state.S, box = $('secModal');
+    if (!box) return;
+    var all = SG.engine.indexMembers(S.m, key).slice();
+    all.sort(function (a, b) { return pctOf(b) - pctOf(a); });
+    var idx = C.idx3(S), info = null, i;
+    for (i = 0; i < idx.length; i++) if (idx[i].key === key) info = idx[i];
+    var amt = 0, up = 0, dn = 0, star = 0, gem = 0;
+    for (i = 0; i < all.length; i++) {
+      var p2 = pctOf(all[i]);
+      amt += all[i].day.amt;
+      if (p2 > 0.0001) up++; else if (p2 < -0.0001) dn++;
+      if (all[i].code.slice(0, 3) === '688') star++;
+      else if (all[i].code.slice(0, 3) === '300') gem++;
+    }
+    $('secTitle').textContent = info ? info.name : '指数';
+    var tag = key === 'sh' ? '全市场成分' : (key === 'lg' ? '大市值 + 科创龙头' : '中市值');
+    $('secMeta').innerHTML = '<span class="' + U.cls(info ? info.chg : 0) + '">' +
+      (info ? info.v.toFixed(2) + ' · ' + U.fmtPct(info.chg) : '') + '</span>' +
+      '<i>' + all.length + ' 只 · 上涨 ' + up + ' / 下跌 ' + dn +
+      (star || gem ? ' · 科创 ' + star + ' / 创业 ' + gem : '') +
+      ' · 成交 ' + U.fmtMoney(amt) + ' · ' + tag + '</i>';
+    $('secBody').innerHTML = rowsHtml(all);
     box.classList.add('on');
   }
 
@@ -4796,6 +4897,15 @@ button,input,select,textarea,.row,.mrow,.wrow,.trow,.secrow{-webkit-user-select:
       openSec(id);                 // 弹出这个板块的全部成分股
       renderHeat(S);
     });
+    var i3 = document.querySelectorAll('.i3[data-idx]');
+    Array.prototype.forEach.call(i3, function (el) {
+      el.addEventListener('click', function () {
+        var k = el.getAttribute('data-idx'), S = SG.state.S;
+        var kids = document.querySelectorAll('.i3[data-idx]');
+        Array.prototype.forEach.call(kids, function (x) { x.className = 'i3' + (x === el ? ' on' : ''); });
+        openIdx(k);
+      });
+    });
     var sm = $('secModal');
     if (sm) {
       sm.addEventListener('click', function (e) {
@@ -4834,7 +4944,7 @@ button,input,select,textarea,.row,.mrow,.wrow,.trow,.secrow{-webkit-user-select:
     });
   }
 
-  SG.pageMarket = { render: render, init: init, renderRank: renderRank, openSec: openSec, closeSec: closeSec };
+  SG.pageMarket = { render: render, init: init, renderRank: renderRank, openSec: openSec, openIdx: openIdx, closeSec: closeSec };
   SG.router.register('market', SG.pageMarket);
   if (typeof module !== 'undefined' && module.exports) module.exports = SG;
 })(typeof globalThis !== 'undefined' ? globalThis : this);
@@ -5261,11 +5371,13 @@ button,input,select,textarea,.row,.mrow,.wrow,.trow,.secrow{-webkit-user-select:
     if (bookEl) bookEl.style.display = tab === 'tape' ? 'none' : '';
     if (tapeEl) tapeEl.style.display = tab === 'tape' ? '' : 'none';
     if (tab === 'tape') { renderTape(S); $('bookMeta').innerHTML = '<span class="dim">' + U.fmtVol(st.day.v) + '</span>'; return; }
-    var asks = b.asks.slice(0, 5).reverse(), bids = b.bids.slice(0, 5);
     var maxQ = 1;
     b.asks.concat(b.bids).forEach(function (l) { if (l.q > maxQ) maxQ = l.q; });
     function lvl(l, i, isAsk) {
-      if (!l) return '';
+      var lb = '<span class="lb">' + (isAsk ? '卖' : '买') + (i + 1) + '</span>';
+      /* 固定五档：缺档画占位行（涨停时卖盘为空、跌停时买盘为空） */
+      if (!l) return '<div class="lvl empty">' + lb +
+        '<span class="pr num dim">—</span><span class="qt num dim">—</span></div>';
       var w = Math.max(4, l.q / maxQ * 100);
       var col = isAsk ? 'rgba(18,185,129,.55)' : 'rgba(255,77,79,.55)';
       /* 玩家挂在这一档：显示自己的量 + 前面还排着多少手 */
@@ -5277,11 +5389,11 @@ button,input,select,textarea,.row,.mrow,.wrow,.trow,.secrow{-webkit-user-select:
           (ma > 0 ? '·前' + Math.round(ma / 100) + '手' : '·最前') + '</i>';
       }
       return '<div class="lvl' + (mine ? ' has-mine' : '') + '"><i class="bar" style="width:' + w + '%;background:' + col + '"></i>' +
-        '<span class="lb">' + (isAsk ? '卖' : '买') + (isAsk ? 5 - i : i + 1) + '</span>' +
+        '<span class="lb">' + (isAsk ? '卖' : '买') + (i + 1) + '</span>' +
         '<span class="pr num ' + (isAsk ? 'down' : 'up') + '">' + (l.pc / 100).toFixed(2) + '</span>' + mine +
         '<span class="qt num">' + Math.round(l.q / 100) + '</span></div>';
     }
-    for (var i = 0; i < asks.length; i++) html += lvl(asks[i], i, true);
+    for (var i = 4; i >= 0; i--) html += lvl(b.asks[i], i, true);
     var c = pct(st);
     var sb = 0, sa = 0;
     b.bids.slice(0, 5).forEach(function (x) { sb += x.q; });
@@ -5289,7 +5401,7 @@ button,input,select,textarea,.row,.mrow,.wrow,.trow,.secrow{-webkit-user-select:
     html += '<div class="mid"><span class="num ' + U.cls(c) + '" style="font-size:14px;font-weight:600">' +
       (st.pc / 100).toFixed(2) + '</span><span class="num">委比 ' +
       ((sb - sa) / (sb + sa || 1) * 100).toFixed(1) + '%</span></div>';
-    for (var j = 0; j < bids.length; j++) html += lvl(bids[j], j, false);
+    for (var j = 0; j < 5; j++) html += lvl(b.bids[j], j, false);
     var bkEl = $('book');
     if (bkEl.dataset.html !== html) { bkEl.innerHTML = html; bkEl.dataset.html = html; }
 
@@ -5624,33 +5736,125 @@ button,input,select,textarea,.row,.mrow,.wrow,.trow,.secrow{-webkit-user-select:
   function renderQuote(S) {
     var st = S.stock, box = $('trBook');
     if (!box || !st || !st.book) return;
-    var asks = (st.book.asks || []).slice(0, 5), bids = (st.book.bids || []).slice(0, 5);
+    var asks = st.book.asks || [], bids = st.book.bids || [];
     var maxQ = 1, i;
     for (i = 0; i < asks.length; i++) if (asks[i].q > maxQ) maxQ = asks[i].q;
     for (i = 0; i < bids.length; i++) if (bids[i].q > maxQ) maxQ = bids[i].q;
     var cls = U.cls(st.pc - st.prevClose);
     var html = '';
-    for (i = asks.length - 1; i >= 0; i--) {
-      var a = asks[i], aw = Math.max(3, Math.round(a.q / maxQ * 100));
-      html += '<div class="tbrow ask"><i style="width:' + aw + '%"></i>' +
-        '<span class="tbk">卖' + (i + 1) + '</span>' +
-        '<span class="tbp num">' + (a.pc / 100).toFixed(2) + '</span>' +
-        '<span class="tbq num">' + Math.round(a.q / 100) + '</span></div>';
+    function tbrow(l, idx, isAsk) {
+      var k = '<span class="tbk">' + (isAsk ? '卖' : '买') + (idx + 1) + '</span>';
+      if (!l) return '<div class="tbrow ' + (isAsk ? 'ask' : 'bid') + ' empty">' + k +
+        '<span class="tbp num dim">—</span><span class="tbq num dim">—</span></div>';
+      var w = Math.max(3, Math.round(l.q / maxQ * 100));
+      return '<div class="tbrow ' + (isAsk ? 'ask' : 'bid') + '"><i style="width:' + w + '%"></i>' + k +
+        '<span class="tbp num">' + (l.pc / 100).toFixed(2) + '</span>' +
+        '<span class="tbq num">' + Math.round(l.q / 100) + '</span></div>';
     }
+    for (i = 4; i >= 0; i--) html += tbrow(asks[i], i, true);
     html += '<div class="tbmid"><span class="num ' + cls + '">' + (st.pc / 100).toFixed(2) + '</span>' +
       '<span class="tbm num ' + cls + '">' + U.fmtPct((st.pc - st.prevClose) / st.prevClose) + '</span></div>';
-    for (i = 0; i < bids.length; i++) {
-      var b = bids[i], bw = Math.max(3, Math.round(b.q / maxQ * 100));
-      html += '<div class="tbrow bid"><i style="width:' + bw + '%"></i>' +
-        '<span class="tbk">买' + (i + 1) + '</span>' +
-        '<span class="tbp num">' + (b.pc / 100).toFixed(2) + '</span>' +
-        '<span class="tbq num">' + Math.round(b.q / 100) + '</span></div>';
-    }
+    for (i = 0; i < 5; i++) html += tbrow(bids[i], i, false);
     if (box.dataset.h !== html) { box.innerHTML = html; box.dataset.h = html; }
     var meta = $('trBookMeta');
     if (meta) meta.textContent = '额 ' + U.fmtMoney(st.day.amt);
   }
 
+
+  /* ============================ 区块 C3：迷你分时 ============================ */
+  var miniSig = '';
+  function renderMini(S) {
+    var cv = $('trChart');
+    if (!cv || !cv.getContext) return;
+    var st = S.stock, m = S.m, mins = st.minutes || [], n = mins.length;
+    var chg = (st.pc - st.prevClose) / st.prevClose;
+    var meta = $('trMiniMeta');
+    if (meta) {
+      var mt = (st.pc / 100).toFixed(2) + ' · ' + U.fmtPct(chg) +
+        ' · ' + (m.phase === 'closed' ? '收盘' : U.minuteLabel(Math.min(239, m.minute)));
+      if (meta.textContent !== mt) meta.textContent = mt;
+    }
+    var sz = C.boxSize(cv), W = Math.round(sz.w), H = Math.round(sz.h);
+    if (!W || !H) return;
+    var sig = st.code + '|' + m.day + '|' + n + '|' + st.pc + '|' + W + 'x' + H + '|' + m.phase;
+    if (sig === miniSig) return;
+    miniSig = sig;
+    var dpr = Math.min(2, root.devicePixelRatio || 1);
+    if (cv.width !== Math.round(W * dpr) || cv.height !== Math.round(H * dpr)) {
+      cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+    }
+    var g = cv.getContext('2d');
+    g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    g.clearRect(0, 0, W, H);
+    var padL = 2, padR = 40, padT = 5, padB = 11;
+    var volH = Math.max(14, Math.round((H - padT - padB) * 0.22));
+    var priceH = H - padT - padB - volH - 6;
+    var innerW = W - padL - padR;
+    if (priceH < 20 || innerW < 20) return;
+    var lo = st.prevClose, hi = st.prevClose, avg = 0, cumAmt = 0, cumV = 0, maxV = 1, i;
+    for (i = 0; i < n; i++) {
+      var mb = mins[i];
+      cumAmt += mb.amt; cumV += mb.v;
+      avg = cumV > 0 ? cumAmt / cumV * 100 : mb.c;
+      if (mb.c < lo) lo = mb.c; if (mb.c > hi) hi = mb.c;
+      if (avg < lo) lo = avg; if (avg > hi) hi = avg;
+      if (mb.v > maxV) maxV = mb.v;
+    }
+    if (hi - lo < 2) { hi += 1; lo -= 1; }
+    var padP = (hi - lo) * 0.12;
+    lo -= padP; hi += padP;
+    var X = function (t) { return padL + (t / 239) * innerW; };
+    var Y = function (pc) { return padT + priceH - ((pc - lo) / (hi - lo)) * priceH; };
+    var col = st.pc >= st.prevClose ? '#ff4d4f' : '#12b981';
+    var fill = st.pc >= st.prevClose ? 'rgba(255,77,79,.16)' : 'rgba(18,185,129,.16)';
+    /* 昨收虚线 */
+    g.strokeStyle = 'rgba(255,255,255,.18)';
+    g.setLineDash([3, 4]); g.lineWidth = 1;
+    g.beginPath(); g.moveTo(padL, Y(st.prevClose)); g.lineTo(padL + innerW, Y(st.prevClose)); g.stroke();
+    g.setLineDash([]);
+    if (n > 1) {
+      /* 价格面积 */
+      g.beginPath();
+      g.moveTo(X(mins[0].t), Y(mins[0].c));
+      for (i = 1; i < n; i++) g.lineTo(X(mins[i].t), Y(mins[i].c));
+      g.lineTo(X(mins[n - 1].t), padT + priceH);
+      g.lineTo(X(mins[0].t), padT + priceH);
+      g.closePath(); g.fillStyle = fill; g.fill();
+      /* 价格线 */
+      g.beginPath();
+      g.moveTo(X(mins[0].t), Y(mins[0].c));
+      for (i = 1; i < n; i++) g.lineTo(X(mins[i].t), Y(mins[i].c));
+      g.strokeStyle = col; g.lineWidth = 1.3; g.stroke();
+      /* 均价线 */
+      cumAmt = 0; cumV = 0;
+      g.beginPath();
+      for (i = 0; i < n; i++) {
+        cumAmt += mins[i].amt; cumV += mins[i].v;
+        var av = cumV > 0 ? cumAmt / cumV * 100 : mins[i].c;
+        if (i === 0) g.moveTo(X(mins[i].t), Y(av)); else g.lineTo(X(mins[i].t), Y(av));
+      }
+      g.strokeStyle = '#f0b90b'; g.lineWidth = 1; g.stroke();
+    }
+    /* 成交量柱 */
+    var volTop = padT + priceH + 6;
+    var bw = Math.max(1, innerW / 240 * 0.7);
+    for (i = 0; i < n; i++) {
+      var m2 = mins[i], hgt = Math.max(1, (m2.v / maxV) * volH);
+      g.fillStyle = m2.c >= m2.o ? 'rgba(255,77,79,.55)' : 'rgba(18,185,129,.55)';
+      g.fillRect(X(m2.t) - bw / 2, volTop + volH - hgt, bw, hgt);
+    }
+    /* 刻度 */
+    g.font = '9px system-ui, sans-serif';
+    g.textBaseline = 'middle';
+    g.fillStyle = '#7d8a9c';
+    g.textAlign = 'left';
+    g.fillText((hi / 100).toFixed(2), padL + innerW + 4, Y(hi) + 4);
+    g.fillText((lo / 100).toFixed(2), padL + innerW + 4, Y(lo) - 4);
+    g.textAlign = 'center';
+    g.fillText('09:30', padL + 14, H - padB / 2 - 1);
+    g.fillText('11:30/13:00', padL + innerW * 0.5, H - padB / 2 - 1);
+    g.fillText('15:00', padL + innerW - 12, H - padB / 2 - 1);
+  }
   /* ============================ 区块 D：持仓 / 委托 / 成交 ============================ */
   function renderTabs(S) {
     var box = $('trTabs');
@@ -5758,6 +5962,7 @@ button,input,select,textarea,.row,.mrow,.wrow,.trow,.secrow{-webkit-user-select:
     renderAcct(S);
     renderOrder(S);
     renderQuote(S);
+    renderMini(S);
     renderTabs(S);
     renderList(S);
   }
@@ -6184,15 +6389,19 @@ button,input,select,textarea,.row,.mrow,.wrow,.trow,.secrow{-webkit-user-select:
     if (m.phase !== 'trading') { breakTick(); schedule(); return; }
     var ms = tickMs(s);
     if (!s.lastReal) s.lastReal = now;
+    /* 高倍速时一帧内要跑很多步，单帧预算必须收窄，否则一次 advance 会占满整帧、感觉卡顿 */
+    var fast = s.speed >= 30 ? 2 : (s.speed >= 15 ? 1.5 : 1);
+    var capN = fast > 1 ? Math.round(40 / fast) : 40;
+    var budget = fast > 1 ? 26 : 45;
     var n = Math.floor((now - s.lastReal) / ms);
     if (n < 1) n = 1;
-    if (n > 40) { n = 40; s.lastReal = now; } else { s.lastReal += n * ms; }
-    /* 一次最多跑 45ms：卡顿时宁可丢掉几分钟的行情，也不要整页冻住 */
+    if (n > capN) { n = capN; s.lastReal = now; } else { s.lastReal += n * ms; }
+    /* 一次最多跑 budget 毫秒：卡顿时宁可丢掉几分钟的行情，也不要整页冻住 */
     var nowFn = (typeof performance !== 'undefined' && performance.now) ? function () { return performance.now(); } : function () { return Date.now(); };
     var t0 = nowFn();
     for (var i = 0; i < n && m.phase === 'trading'; i++) {
       E.step(m);
-      if (nowFn() - t0 > 45) { s.lastReal = now; break; }
+      if (nowFn() - t0 > budget) { s.lastReal = now; break; }
     }
     if (m.phase === 'closed') {
       closeDay();          // 收盘结算（记净值、日线、作废委托、T+1）
@@ -6202,7 +6411,13 @@ button,input,select,textarea,.row,.mrow,.wrow,.trow,.secrow{-webkit-user-select:
       schedule();
       return;
     }
-    refresh();
+    /* 高倍速下把「画」压到 ~8fps：行情还是在跑，只是没必要每秒重排十几次 DOM */
+    if (s.speed >= 30 && s.lastPaint && now - s.lastPaint < 120) {
+      s.dirty = true;
+    } else {
+      refresh();
+      s.lastPaint = now;
+    }
     schedule();
   }
 

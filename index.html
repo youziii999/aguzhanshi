@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-<!-- 重生之我是股神 · 单文件版 v4.7 · 构建于 2026-10-24 13:55 · 源码见 stock-game/ -->
+<!-- 重生之我是股神 · 单文件版 v4.8 · 构建于 2026-10-24 14:07 · 源码见 stock-game/ -->
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0b0e13">
@@ -1010,6 +1010,76 @@ button,input,select,textarea,.row,.mrow,.wrow,.trow,.secrow{-webkit-user-select:
 .totop:active{filter:brightness(1.3)}
 @media (min-width:761px){.totop{display:none!important}}
 
+/* ============================================================
+   §17 v4.8：手机顶栏紧凑 + 盘面控制面板
+   ------------------------------------------------------------
+   手机上顶栏只留「指数 / 时间 / 一个胶囊按钮」，点胶囊弹出面板：
+   速度、跳日、侧栏、重开都收进面板，每个按钮配一行小字说明。
+   ============================================================ */
+.ctlpill{display:none}
+.mbox.ctlbox{max-width:420px;max-height:88dvh;overflow-y:auto;gap:11px}
+.ctl-now{font-size:11px;font-weight:400;color:var(--dim);letter-spacing:0}
+.ctlsec{display:flex;flex-direction:column;gap:6px}
+.ctl-h{font-size:12px;color:var(--dim);display:flex;flex-wrap:wrap;gap:4px;align-items:baseline}
+.ctl-h .dim{font-size:10.5px;opacity:.85}
+.ctl-row{display:flex;flex-direction:column;gap:5px}
+.ctlbtn{
+  padding:9px 12px;border-radius:9px;border:1px solid var(--line);
+  background:#1b2432;color:var(--text);font-family:inherit;font-size:14px;
+  text-align:left;line-height:1.35;touch-action:manipulation;
+}
+.ctlbtn:active{filter:brightness(1.3)}
+.ctlbtn.danger{color:#ffb4b4;border-color:#5a2b30;background:#2a161a}
+.ctl-desc{font-size:11px;line-height:1.55;color:var(--dim)}
+.ctl-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.ctl-grid button{
+  display:flex;flex-direction:column;gap:3px;padding:9px 10px;border-radius:9px;
+  border:1px solid var(--line);background:#1b2432;color:var(--text);
+  font-family:inherit;text-align:left;touch-action:manipulation;
+}
+.ctl-grid button b{font-size:15px;line-height:1.2}
+.ctl-grid button i{font-style:normal;font-size:10.5px;line-height:1.45;color:var(--dim)}
+.ctl-grid button.on{border-color:rgba(240,185,11,.55);background:rgba(240,185,11,.14)}
+.ctl-grid button.on b{color:#ffd479}
+.ctl-grid button:active{filter:brightness(1.25)}
+.ctlclose{
+  margin-top:1px;padding:11px;border-radius:10px;border:1px solid var(--line);
+  background:#202a36;color:var(--text);font-family:inherit;font-size:14px;
+  touch-action:manipulation;
+}
+.ctlclose:active{filter:brightness(1.25)}
+@media (max-width:760px){
+  /* 顶栏紧凑：四个按钮全收进面板，只留一个显示当前速度的胶囊 */
+  .clock .speed,#btnSkip,#btnList,#btnReset{display:none!important}
+  .ctlpill{
+    display:inline-flex;align-items:center;justify-content:center;
+    padding:5px 9px;border-radius:9px;border:1px solid rgba(240,185,11,.35);
+    background:rgba(240,185,11,.12);color:#ffd479;
+    font-family:inherit;font-size:12px;font-weight:600;line-height:1.3;
+    white-space:nowrap;touch-action:manipulation;
+  }
+  .ctlpill:active{filter:brightness(1.25)}
+  .clock .d{display:block;font-size:9.5px;line-height:1.25}
+  /* 面板在小屏上收紧，尽量一屏放下 */
+  .mbox.ctlbox{max-width:100%;padding:14px;gap:9px}
+  .ctlsec{gap:4px}
+  .ctl-h{font-size:11.5px}
+  .ctl-h .dim{font-size:10px}
+  .ctlbtn{padding:8px 11px;font-size:13.5px}
+  .ctl-desc{font-size:10.5px;line-height:1.5}
+  .ctl-grid{gap:7px}
+  .ctl-grid button{padding:8px 9px}
+  .ctl-grid button b{font-size:14px}
+  .ctl-grid button i{font-size:10px}
+  .ctlclose{padding:10px;font-size:13.5px}
+}
+@media (max-width:420px){
+  .ctlpill{padding:4px 7px;font-size:11px}
+  .ctl-grid button{padding:8px 9px}
+  .ctl-grid button i{font-size:10px}
+  .ctlbtn{font-size:13.5px;padding:9px 11px}
+}
+
 </style>
 </head>
 <body data-page="market">
@@ -1019,7 +1089,7 @@ button,input,select,textarea,.row,.mrow,.wrow,.trow,.secrow{-webkit-user-select:
        顶栏 —— 全站共享：三条指数 / 涨跌家数 / 时钟 / 倍速
        ============================================================ -->
   <header class="topbar">
-    <div class="brand"><span class="dot"></span>大A？简单！<small>SIM</small><i class="ver" id="appVer">v4.7</i></div>
+    <div class="brand"><span class="dot"></span>大A？简单！<small>SIM</small><i class="ver" id="appVer">v4.8</i></div>
     <div class="idxbox">
       <span class="nm">上证</span>
       <span class="v num" id="idxV">3000.00</span>
@@ -1056,6 +1126,7 @@ button,input,select,textarea,.row,.mrow,.wrow,.trow,.secrow{-webkit-user-select:
       <button class="iconbtn" id="btnSkip" title="跳到收盘，进入下一天">⏭</button>
       <button class="iconbtn" id="btnList" title="显示 / 隐藏个股侧栏">☰</button>
       <button class="iconbtn" id="btnReset" title="重开一局">↻</button>
+      <button class="ctlpill" id="btnCtl" title="盘面控制：时间、速度、跳日、侧栏、重开">5× ▾</button>
     </div>
   </header>
 
@@ -1497,6 +1568,59 @@ button,input,select,textarea,.row,.mrow,.wrow,.trow,.secrow{-webkit-user-select:
     <div class="secmeta" id="secMeta"></div>
     <div class="secbody" id="secBody"></div>
     <button class="secclose" id="secClose">关闭</button>
+  </div>
+</div>
+
+<!-- ============================================================
+       手机端盘面控制面板（整合顶栏全部功能，每项带一行小字说明）
+       ============================================================ -->
+<div class="modal" id="ctlSheet">
+  <div class="mbox ctlbox">
+    <div class="mt">盘面控制 <span class="ctl-now num" id="ctlNow">第 1 天 · 09:30 · 1×</span></div>
+
+    <div class="ctlsec">
+      <div class="ctl-h">时间</div>
+      <div class="ctl-row">
+        <button class="ctlbtn" id="ctlPause">暂停</button>
+        <span class="ctl-desc">行情停住不动，方便慢慢看盘、算价下单；再点一次继续。</span>
+      </div>
+    </div>
+
+    <div class="ctlsec">
+      <div class="ctl-h">速度 <span class="dim">（默认 1 小时/天，可在「我的 → 交易节奏」改）</span></div>
+      <div class="ctl-grid" id="ctlSpeed">
+        <button data-cs="1"><b>1×</b><i>1 秒走 1 秒 · 约 1 小时</i></button>
+        <button data-cs="5"><b>5×</b><i>快 5 倍 · 约 12 分钟</i></button>
+        <button data-cs="15"><b>15×</b><i>快 15 倍 · 约 4 分钟</i></button>
+        <button data-cs="60"><b>60×</b><i>最快 · 约 1 分钟</i></button>
+      </div>
+    </div>
+
+    <div class="ctlsec">
+      <div class="ctl-h">交易日</div>
+      <div class="ctl-row">
+        <button class="ctlbtn" id="ctlSkip">跳到下一天</button>
+        <span class="ctl-desc">盘中点了先跑完今天剩余时间；收盘休息时直接开下一天。</span>
+      </div>
+    </div>
+
+    <div class="ctlsec">
+      <div class="ctl-h">面板</div>
+      <div class="ctl-row">
+        <button class="ctlbtn" id="ctlList">收起 / 展开自选侧栏</button>
+        <span class="ctl-desc">个股页左侧的自选列表。屏幕小就收起来，图表更宽。</span>
+      </div>
+    </div>
+
+    <div class="ctlsec">
+      <div class="ctl-h">重开</div>
+      <div class="ctl-row">
+        <button class="ctlbtn danger" id="ctlReset">重开一局</button>
+        <span class="ctl-desc">清空资金、持仓、委托和成交，重新生成行情，不能撤销。</span>
+      </div>
+    </div>
+
+    <button class="ctlclose" id="ctlClose">关闭</button>
   </div>
 </div>
 
@@ -6768,6 +6892,7 @@ button,input,select,textarea,.row,.mrow,.wrow,.trow,.secrow{-webkit-user-select:
     if (typeof document !== 'undefined' && document.hidden) { s.dirty = true; return; }
     s.dirty = false;
     SG.uiCommon.renderTop(s);
+    syncCtl();
     SG.router.render(s);
   }
 
@@ -6811,6 +6936,64 @@ button,input,select,textarea,.row,.mrow,.wrow,.trow,.secrow{-webkit-user-select:
       var c = box.children[i], v = parseFloat(c.dataset.s);
       c.className = v === 0 ? (s.speed === 0 ? 'on' : '') : (v === s.speed ? 'on' : '');
       if (v === 0) c.textContent = s.speed === 0 ? '继续' : '暂停';
+    }
+    syncCtl();
+  }
+
+  /* 手机端盘面控制面板：按钮全部代理到原生控件，逻辑只留一份 */
+  function ctlOn(el) {
+    if (!el) return false;
+    if (el.classList && typeof el.classList.contains === 'function') return el.classList.contains('on');
+    return (' ' + (el.className || '') + ' ').indexOf(' on ') >= 0;
+  }
+  function ctlSet(el, on) {
+    if (!el) return;
+    if (el.classList && typeof el.classList.add === 'function') {
+      if (on) el.classList.add('on'); else el.classList.remove('on');
+      return;
+    }
+    var c = (' ' + (el.className || '') + ' ').replace(' on ', ' ').replace(/\s+/g, ' ').trim();
+    el.className = on ? (c ? c + ' on' : 'on') : c;
+  }
+  function ctlOpen() {
+    ctlSet(document.getElementById('ctlSheet'), true);
+    syncCtl();
+  }
+  function ctlClose() {
+    ctlSet(document.getElementById('ctlSheet'), false);
+  }
+  var ctlPillTxt = '', ctlNowTxt = '';
+  function syncCtl() {
+    var s = st(), m = s.m || {};
+    var stTxt = s.speed ? (s.speed + '×') : '暂停';
+    var pill = document.getElementById('btnCtl');
+    if (pill) {
+      var pt = s.speed ? (s.speed + '× ▾') : '暂停 ▾';
+      if (pt !== ctlPillTxt) { pill.textContent = pt; ctlPillTxt = pt; }
+    }
+    var sheet = document.getElementById('ctlSheet');
+    if (!ctlOn(sheet)) return;
+    var nowTxt = '第 ' + (m.day || 1) + ' 天 · ' +
+      (m.phase === 'closed' ? '收盘休息' : U.minuteLabel(m.minute == null ? 0 : Math.min(239, m.minute))) +
+      ' · ' + stTxt;
+    if (nowTxt !== ctlNowTxt) {
+      var now = document.getElementById('ctlNow');
+      if (now) now.textContent = nowTxt;
+      ctlNowTxt = nowTxt;
+    }
+    var pb = document.getElementById('ctlPause');
+    if (pb) {
+      var lbl = s.speed ? '暂停' : ('继续（' + (s.lastSpeed || 1) + '×）');
+      if (pb.textContent !== lbl) pb.textContent = lbl;
+    }
+    var box = document.getElementById('ctlSpeed');
+    if (box) {
+      for (var i = 0; i < box.children.length; i++) {
+        var c = box.children[i];
+        if (!c) continue;
+        var on = Number(c.dataset.cs) === s.speed;
+        if (on !== ctlOn(c)) ctlSet(c, on);
+      }
     }
   }
 
@@ -6920,6 +7103,26 @@ button,input,select,textarea,.row,.mrow,.wrow,.trow,.secrow{-webkit-user-select:
     /* 侧栏开关 */
     on('btnList', 'click', toggleLeft);
     on('btnCloseList', 'click', function () { setLeft(false); });
+
+    /* 手机端盘面控制：整合顶栏的时间 / 速度 / 跳日 / 侧栏 / 重开 */
+    on('btnCtl', 'click', ctlOpen);
+    on('ctlClose', 'click', ctlClose);
+    on('ctlSheet', 'click', function (e) { if (e.target === e.currentTarget) ctlClose(); });
+    on('ctlPause', 'click', function () {
+      var b = document.querySelector ? document.querySelector('#speed button[data-s="0"]') : null;
+      if (b) b.click();
+      else setSpeed(st().speed ? 0 : (st().lastSpeed || 1));
+      syncCtl();
+    });
+    on('ctlSpeed', 'click', function (e) {
+      var b = e.target.closest ? e.target.closest('[data-cs]') : null;
+      if (!b) return;
+      setSpeed(Number(b.dataset.cs));
+      syncCtl();
+    });
+    on('ctlSkip', 'click', function () { ctlClose(); skipDay(); });
+    on('ctlList', 'click', function () { ctlClose(); toggleLeft(); });
+    on('ctlReset', 'click', function () { ctlClose(); openStart('reset'); });
 
     /* 顶部重置 + 个人页重置：都开启动资金弹层（顺势确认） */
     on('btnReset', 'click', function () { openStart('reset'); });
@@ -7146,6 +7349,7 @@ button,input,select,textarea,.row,.mrow,.wrow,.trow,.secrow{-webkit-user-select:
 
   SG.app = {
     boot: boot, refresh: refresh, schedule: schedule, setSpeed: setSpeed, skipDay: skipDay,
+    syncCtl: syncCtl, ctlOpen: ctlOpen, ctlClose: ctlClose,
     advance: advance, nextDay: nextDay, setLeft: setLeft, toggleLeft: toggleLeft,
     openStart: openStart, closeStart: closeStart, setCash: setCash,
     setPace: setPace, closeDay: closeDay, openNext: openNext, PACE: PACE, BREAK: BREAK

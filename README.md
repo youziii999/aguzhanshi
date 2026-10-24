@@ -339,3 +339,25 @@ stock-game/
 | DOM 量与滚动 | 虚拟列表让自选页 DOM 从 324 行降到 ~30 行；`ui-common.js` 提供共享 `vlist()` / `onScrollThrottled()` | DOM 节点 5311 → **2244**；滚动 0.3ms |
 
 `content-visibility:auto` 实测无收益（warm / cv / back 三组基本一致），已放弃；手机基准脚本：`deploy/bench-m.js`、`bench-m2.js`、`bench-m3.js`、`prof-m.js`。
+
+---
+
+## 十八、v4.3 改了什么（玩久了不卡：核心是别再制造垃圾）
+
+先测清楚再改。结论：卡顿/发热的主因不是渲染，而是**引擎每一步在疯狂创建临时对象**，GC 一直擦屁股；再加上**每帧强制同步布局**和**后台标签页还在跑**。
+
+| 毛病 | 根因 | 改法 | 效果 |
+| --- | --- | --- | --- |
+| 每步 ~7 万个临时对象 | `context()` / `directions()` 每微步 new 一个对象；`buildBook()` 每次 new 2 个数组 + 16 个档位对象；每笔委托 new `{ch,amt}`、`lotsArr`、`meta` | 全部改对象池：`st.ctx` / `st.dir` / `st.book` + `lvSlot()` 档位池 / `st._op` 委托池 / `meta` 复用；`DECAYP[]` 预算 64 个衰减系数 | 单步 7.28 → **6.04ms**（-17%）；同 seed 指纹 `fp=701666263` 完全一致（行情行为零改变） |
+| 每笔成交搬 60 个元素 | `recordTrade` 里 `st.ticks.shift()`，一天上万笔 | 改环形缓冲（`st.ti` 写指针 + `st.tn` 计数 + `st.lastTick`），新增 `tapeOf()` 按时间升序取出 | 成交越密集越明显 |
+| 每帧 2 次强制布局 | `getBoundingClientRect()` / `clientHeight` / `offsetTop` 每帧读 → 浏览器必须先算完样式 | 新增 `ui-common.boxSize()`（ResizeObserver 缓存尺寸）+ `invalidateSize()`；走势图/净值曲线/虚拟列表窗口/自动滚动全改读缓存；`offsetTop` 改成按行号算 | 15 秒 60× 实测：`LayoutCount 108 → 56`、`LayoutDuration 0.741 → 0.416s`、`TaskDuration 2.024 → 1.511s` |
+| 后台还在跑 | `setTimeout` 在后台被压到 1 次/秒，但每次补的帧数是按真实流逝算的 → 切回来一口气补几十步 | `advance()` 开头判 `document.hidden`：不推进、不重绘，回前台再用 `onVisible()` 补刷 | 切到别的 App/标签页不再发热耗电 |
+| 存档越玩越大 | `snapshot()` 存 `baseHistLen` 之后所有日线 | 只存最近 24 个交易日 | day31 的存档 295KB → 稳定 ~90KB |
+| 情绪统计双循环 | `updateSentiment` 18 板块 × 324 只 | 一次遍历 + 复用累加对象；`biasStep` 去 forEach 闭包；`step()` 板块 forEach 改 for | 每次 step 少 6k 次迭代 |
+
+### 测量脚本（可复现）
+`deploy/bench-ab.js`（同 seed 跑 120 步出 ms/步 + 指纹）、`deploy/bench-prof.js`（运行中改 `SG.engine.CFG` 定位成本）、`deploy/bench-long*.js`（30 天增长 / 堆 / DOM / 存档体积）、`deploy/bench-cpu.js`（真实计时器下统计 step 与 render 次数耗时）、`shots/cdp-shot.js` 的 `CDP_PERF_MS=15000`（打印浏览器 `Performance.getMetrics`：Script/Layout/Recalc/Task/LayoutCount）。
+
+### 取舍记录
+`MICRO=2 + MAX_ORDERS_PER_STEP=18` 能把单步再降到 6.00ms（vs 7.08），但会改变行情轨迹（成交倍率、涨停数都变），只值 15%，**不采用**，保持 `MICRO=3 / 26 单 / 8 档`。`content-visibility:auto` 实测无收益，已在 v4.2 放弃。
+

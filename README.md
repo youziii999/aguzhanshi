@@ -481,3 +481,22 @@ stock-game/
 ### 截图
 
 shots/v48-sheet-390.png（面板全貌）、shots/v48-top-320.png（320 窄屏顶栏不裁切）、shots/v48-top-1440.png（桌面顶栏不变）。
+
+---
+
+## 二十四、v4.9 改了什么（开局预加载 / 手机全域滑动 / 板块榜单收起 / 弹窗加自选）
+
+| 需求 | 做法 | 位置 |
+| --- | --- | --- |
+| 行情页点个股要等很久 | 开局 120ms 后把个股页整页挂到屏幕外（`position:fixed;left:-200vw`、宽度取行情页实际宽）先渲染一遍，300ms 后清干净还原；`refresh()` 里用 `s.warming` 短路，避免预热时把用户正在看的行情页切走。首次点行：paint 305.3ms → **44.4ms**，同步段 46.3 → 6.2ms，分时图已画好（chartPixels 785） | `js/app.js` 区块 D2 `warmStock`；`js/page-stock.js` 导出 `SG.pageStock` |
+| 手机个股页不能全域滑 | ≤760 取消个股页面板自己的滚动（`max-height:none` / `overflow:visible`），手指落在五档、持仓、消息上也是滚整页；实测从五档往上拖，页面 `scrollTop 620 → 754` | `css/styles.css` §18 |
+| 板块热力收起 | 默认只显示「全部 + 手机 5 个 / 桌面 9 个」，点「展开 18」显示全部 18 个板块，再点收起；当前筛选的板块被收起时自动补进来 | `js/page-market.js` `heatOpen` / `#mkSecToggle` |
+| 今日榜单收起 | 默认前 6 条，点「展开 12」显示全部，再点收起；切榜单页签仍按当前展开状态渲染 | `js/page-market.js` `rankOpen` / `#mkRankToggle` |
+| 指数/板块弹窗里加自选 | 每行末尾加 ☆，点了只切 ☆/★、toast 提示，不跳个股页，弹窗保持打开；★ 状态与自选页共用 `S.watch` | `js/page-market.js` `rowsHtml` / `.sstar`、`js/state.js` `toggleWatch` |
+
+### 工具与截图
+`shots/cdp-shot.js` 新增：`CDP_CPU`（CPU 降速）、`CDP_DRAG_FIRST`（`Input.dispatchTouchEvent` 手写触摸拖拽，用于验证全域滑动）、`CDP_EVAL_BEFORE/AFTER`（拖拽前后跑脚本并打印）。注意 `Input.synthesizeScrollGesture` 在 headless 里不滚动，已弃用。
+
+基准与验证脚本：`deploy/bench-warm.js`（预热前后首帧耗时）、`deploy/v49-exp.js`（展开板块+榜单）、`deploy/v49-star390.js`（弹窗点☆）、`deploy/v49-toggles.js`（桌面完整回归）。
+
+截图：`shots/v49-market-1440.png`、`v49-market-390.png`（收起态）、`v49-expand-390.png`（展开态）、`v49-star-390.png`（科创指数弹窗 18 行 + ★）、`v49-star-1440.png`、`v49-stock-390.png`、`v49-scroll-book.png`（五档上滑后）、`v49-warm-on.png`。

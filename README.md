@@ -308,3 +308,21 @@ stock-game/
 
 ### 测试
 `node test/struct.js`（id 引用 + 标签闭合）、`node test/dom-smoke.js`（五页切换，0 处异常）、`SG_SINGLE=1 node test/dom-smoke.js`、`node test/play.js`（12 天不变量成立）、`node test/load.js`（读档 768ms / 324 只价格一致）。
+## 十六、v4.1 改了什么
+
+| 需求 | 做法 | 验收 |
+| --- | --- | --- |
+| 分时图加 B/S | `chart.js` 新增 `drawBS()`：从 `SG.state.S.acct.trades` 取当日该票成交，买点画红圆 B（线下 12px）、卖点画绿圆 S（线上 12px），靠边自动翻转 | `shots/v41-bs.png` |
+| 金额改全数字 | `util.fmtMoneyFull()`（`toLocaleString` 两位小数）替换所有**账户类**金额（总资产/盈亏/可用/持仓市值/成本/成交额）；市场类（成交额、资金流、市值）仍用万/亿 | 个人页 `100,000.00`；账户栏 `99,990.69` |
+| 板块点开弹窗 | `index.html` 新增 `#secModal`；`page-market.js` 区块 E2 `openSec/closeSec/secStocks`，按涨幅排序列出该板块全部股票，点行进个股页 | `shots/v41-sec.png`（AI算力 22 只）、`v41-sec-390.png`（半导体 30 只） |
+| 涨跌停巨量封单 | 新增 `sealSize()`（量能 × 利好/利空权重 × 随机 1.3~5.7 倍）、`enterBoard/enterFloor/boardTick`、`breakBoard/breakFloor`；涨停时盘口只剩买一那档巨量封单，板上卖单要逐笔吃掉封单才能破板，机构也会按 hold/open/dist 三种模式撤单 | 封单中位 **2.1~2.3 万手**、最大 41 万手；`shots/v41-seal.png` 买一 **56,732 手** |
+| 卡顿优化 | 左栏股票列表改**虚拟列表**（只渲染视口附近 30 行，行高固定 46px）；盘口/账户栏 innerHTML 去重；`refresh()` 跳过 `document.hidden`；`advance()` 加 45ms 时间预算 | 个股页渲染 **9.9ms → 2.7ms**，点一行进个股 **24ms → 6.7ms**，滚动 0.3ms |
+
+### 封单标定（`test/board.js`，3 天）
+`D1 触板 3 封住 2 炸板 1` / `D2 触板 18 封住 12 炸板 7，封单中位 23,301 手、最大 173,065 手` / `D3 触板 27 封住 19 炸板 8，封单中位 21,144 手、最大 413,196 手`。跌停侧对称（`enterFloor` + `floorMode`）。
+
+### 性能实测（`deploy/bench6.js`，headless Edge）
+`stock1 17.1ms`（首次建 30 行）→ `stock2 2.7` → `engine.step 6.0` → `stock3 1.9` → `afterScroll 0.3` → `clickMarket 8.3` → `clickStock 6.7`；`#stockList` 恒为 30 个 DOM 行（总高 14,904px）。
+
+### 新增文件
+`test/board.js`（封单/炸板标定）、`deploy/bench6.js`、`deploy/demo-seal.js`、`deploy/demo-sec.js`、`deploy/demo-bs.js`。

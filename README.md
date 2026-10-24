@@ -402,3 +402,30 @@ stock-game/
 
 ### 截图
 `shots/v45-market.png`（顶栏 科创 / 科创指数卡）、`shots/v45-star.png`（科创标签 + ±20% + 数量框 ±）、`shots/v45-gate.png`（权限不足弹窗）、`shots/v45-idx.png`（科创指数 18 只成分）、`shots/v45-star-390.png` / `shots/v45-gate-390.png`（手机）。
+
+---
+
+## 二十一、v4.6 改了什么（逐笔折叠 / 点股秒开）
+
+| 需求 | 做法 | 位置 |
+| --- | --- | --- |
+| 手机上滑逐笔成交卡死 | 逐笔改成「行池」：一次建 60 个 `.tape-row`，之后只改文字/颜色/显隐，**再也不重写 innerHTML**，滚动位置不会被 1.5 秒刷新顶回去；默认只显示最新 5 笔，右上角按钮「展开全部 N 笔 / 收起」 | `js/page-stock.js` `tapeEnsure/renderTape`、`index.html` `#tapeMore`、`css/styles.css` `.tape-toggle` |
+| 点股票进详情页要毫秒级 | 个股页渲染拆两段：报价/盘口/下单/持仓**同步先画**（一帧内可见），列表/板块/消息/画图丢到 `requestAnimationFrame` + `setTimeout(0)` 之后；`onShow` 不再重复调 `chart.set`；消息列表 60→24 条；虚拟列表上下留白 8→4 行 | `js/page-stock.js` `render/renderRest/scheduleRest`、`js/router.js` |
+| 弹窗里点个股跳转 | 弹窗点击行先关弹窗并清空 `#secBody` 的 300 多行 HTML，再跳个股页；换股票时自动收起逐笔 | `js/page-market.js`、`js/router.js` `go()` |
+
+### 实测（390×844、dpr3、CPU 4× 节流，CDP 双 rAF 采样）
+| 指标 | 改前 | 改后 |
+| --- | --- | --- |
+| 点股票同步处理（中位） | 14.9ms | **3.0ms** |
+| 点股票同步处理（最大） | 98.5ms | 30.1ms |
+| 弹窗里点个股 | 16.5ms | **2.6ms** |
+| DOM 节点数 | 1833 | **1644** |
+| 首次进个股页的重活（图表） | 与首帧一起卡 99ms | 挪到首帧之后（先出字，图表晚一帧） |
+
+测法：`$env:CDP_CPU="4"; node shots/cdp-shot.js "file:///.../aguzhanshi.html#fresh=1&demo=110&skipstart=1" 390 844 3 out.png @deploy/bench-nav.js`。
+
+### 测过的死路
+`content-visibility:auto` 给长列表：稳态 5 次取最小值后无收益（差异来自缓存变热），已放弃；真正有效的是虚拟列表 + 值去重 + 渲染分段。
+
+### 截图
+`shots/v46-tape-5-390.png`（手机，默认 5 笔 + 展开按钮）、`shots/v46-tape-60-390.png`（展开 60 笔 + 收起）、`shots/v46-tape-1440.png`（桌面右栏逐笔 60 笔）。

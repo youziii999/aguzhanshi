@@ -326,3 +326,16 @@ stock-game/
 
 ### 新增文件
 `test/board.js`（封单/炸板标定）、`deploy/bench6.js`、`deploy/demo-seal.js`、`deploy/demo-sec.js`、`deploy/demo-bs.js`。
+
+---
+
+## 十七、v4.2 改了什么（手机端 + 响应速度）
+
+| 需求 | 做法 | 实测（390×844 @dpr3） |
+| --- | --- | --- |
+| 手机端优化 | `css/styles.css` 新增 §14：`touch-action:manipulation`、`-webkit-user-select:none`、`:active` 亮度反馈；输入框字号统一 16px（iOS 聚焦不再自动放大）；弹层改底部抽屉 + `env(safe-area-inset-bottom)`；★ 与「卖出」按钮加大触控区；`overscroll-behavior:contain` 防拖到底把整页带走 | 输入框不再触发页面缩放；按钮更好点 |
+| 顶栏小屏溢出 | ≤600px 收起 15× 与重开 ↻（重开仍在「我的 → 游戏设置」），≤420px 再收 brand | 390 / 480 / 620 三档均不再裁切 |
+| 页面渲染提速 | `page-watch.js` 列表改虚拟列表（只渲染可视 ~30 行 + 上下撑高），每帧值未变不写 DOM；`page-me.js` 净值曲线尺寸/签名不变就不重设画布，`#meCards/#mePos/#meTrades` innerHTML 去重；`chart.js` 加 `drawKey` 签名，数据没变直接不重画，`resize()` 不重复分配画布 | market 3.2→**0.3ms**、watch 7.8→**0.1ms**、trade 6.2→**0.1ms**、me 12.1→**0.1ms**、stock 14.9→**0.6ms** |
+| DOM 量与滚动 | 虚拟列表让自选页 DOM 从 324 行降到 ~30 行；`ui-common.js` 提供共享 `vlist()` / `onScrollThrottled()` | DOM 节点 5311 → **2244**；滚动 0.3ms |
+
+`content-visibility:auto` 实测无收益（warm / cv / back 三组基本一致），已放弃；手机基准脚本：`deploy/bench-m.js`、`bench-m2.js`、`bench-m3.js`、`prof-m.js`。

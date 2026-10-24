@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-<!-- 重生之我是股神 · 单文件版 v4.5 · 构建于 2026-10-24 13:17 · 源码见 stock-game/ -->
+<!-- 重生之我是股神 · 单文件版 v4.6 · 构建于 2026-10-24 13:41 · 源码见 stock-game/ -->
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0b0e13">
@@ -753,6 +753,8 @@ button{font-family:inherit}
 .starbtn{background:none;border:0;color:var(--dim2);font-size:16px;line-height:1;cursor:pointer;padding:0 2px}
 .starbtn.on{color:var(--accent)}
 .tape{display:flex;flex-direction:column;gap:1px;padding:6px 10px;font-size:12px}
+.tape-toggle{padding:2px 8px;font-size:11px;line-height:1.5;border-radius:6px;background:rgba(255,255,255,.06);color:var(--dim);border:1px solid rgba(255,255,255,.10);white-space:nowrap}
+.tape-toggle:active{background:rgba(255,255,255,.14)}
 .tape-row{display:grid;grid-template-columns:62px 1fr 62px;gap:6px;align-items:center;padding:2px 2px;border-radius:4px}
 .tape-row .tt{color:var(--dim2);font-size:11px}
 .tape-row .tp{font-weight:600}
@@ -994,7 +996,7 @@ button,input,select,textarea,.row,.mrow,.wrow,.trow,.secrow{-webkit-user-select:
        顶栏 —— 全站共享：三条指数 / 涨跌家数 / 时钟 / 倍速
        ============================================================ -->
   <header class="topbar">
-    <div class="brand"><span class="dot"></span>大A？简单！<small>SIM</small><i class="ver" id="appVer">v4.5</i></div>
+    <div class="brand"><span class="dot"></span>大A？简单！<small>SIM</small><i class="ver" id="appVer">v4.6</i></div>
     <div class="idxbox">
       <span class="nm">上证</span>
       <span class="v num" id="idxV">3000.00</span>
@@ -1261,7 +1263,7 @@ button,input,select,textarea,.row,.mrow,.wrow,.trow,.secrow{-webkit-user-select:
         <div class="panel-hd tabs" id="bookTabs">
           <button data-btab="book" class="on">五档盘口</button>
           <button data-btab="tape">逐笔成交</button>
-          <div class="right dim num" id="bookMeta"></div>
+          <div class="right"><button class="mini tape-toggle" id="tapeMore" style="display:none">展开全部</button><span class="dim num" id="bookMeta"></span></div>
         </div>
         <div class="panel-bd">
           <div class="book" id="book"></div>
@@ -4307,7 +4309,10 @@ button,input,select,textarea,.row,.mrow,.wrow,.trow,.secrow{-webkit-user-select:
   function go(id, opts) {
     if (!pages[id]) return false;
     var S = SG.state.S;
-    if (opts && opts.code) { S.sel = opts.code; S.orderPrice = null; S.orderQty = 100; }
+    if (opts && opts.code) {
+      if (S.sel !== opts.code) S.tapeOpen = false;
+      S.sel = opts.code; S.orderPrice = null; S.orderQty = 100;
+    }
     var changedPage = S.page !== id;
     S.page = id;
     syncDom(S);
@@ -4990,7 +4995,11 @@ button,input,select,textarea,.row,.mrow,.wrow,.trow,.secrow{-webkit-user-select:
       sm.addEventListener('click', function (e) {
         if (e.target === sm || e.target.id === 'secClose') { closeSec(); return; }
         var row = e.target.closest('[data-code]');
-        if (row) { closeSec(); SG.router.go('stock', { code: row.dataset.code }); }
+        if (row) {
+          closeSec();
+          var sb = $('secBody'); if (sb) sb.innerHTML = '';
+          SG.router.go('stock', { code: row.dataset.code });
+        }
       });
     }
     var hd = document.querySelector('.listcard .listhd');
@@ -5281,7 +5290,7 @@ button,input,select,textarea,.row,.mrow,.wrow,.trow,.secrow{-webkit-user-select:
   }
 
   var rowCache = {}, listSig2 = '', rowsAll = [];
-  var RH = 46, RPAD = 8;    // 行高固定 46px，只渲染视口附近的几十行（虚拟列表）
+  var RH = 46, RPAD = 4;    // 行高固定 46px，只渲染视口附近的几十行（虚拟列表）
 
   function listWindow(box, n) {
     var top = box ? (box.scrollTop || 0) : 0;
@@ -5423,20 +5432,61 @@ button,input,select,textarea,.row,.mrow,.wrow,.trow,.secrow{-webkit-user-select:
   }
 
   /* ============================ 区块 C：盘口 / 逐笔 ============================ */
-  function renderTape(S) {
-    var st = S.stock;
-    var raw = (SG.engine && SG.engine.tapeOf) ? SG.engine.tapeOf(st) : (st.ticks || []);
-    var arr = raw.slice().reverse(), html = '';
-    var n = Math.min(arr.length, 40);
-    for (var i = 0; i < n; i++) {
-      var t = arr[i];
-      html += '<div class="tape-row' + (t.my ? ' mine' : '') + '">' +
-        '<span class="tt num">' + U.minuteLabel(Math.min(239, t.m)) + '</span>' +
-        '<span class="tp num ' + (t.side > 0 ? 'up' : 'down') + '">' + (t.pc / 100).toFixed(2) + '</span>' +
-        '<span class="tq num ' + (t.side > 0 ? 'up' : 'down') + '">' + Math.max(1, Math.round(t.q / 100)) + '</span>' +
-        '</div>';
+  /* 逐笔成交：默认只显示最新 5 笔，点“展开全部”才看更多。
+     行节点建一次、之后只改文字（不重写 innerHTML），滚动位置不会被每 1.5 秒的刷新顶回去。 */
+  var TAPE_MAX = 60;
+  var tapePool = [], tapeEmpty = null;
+  function tapeEnsure(box) {
+    if (!box || tapePool.length) return;
+    for (var i = 0; i < TAPE_MAX; i++) {
+      var d = document.createElement('div');
+      d.className = 'tape-row';
+      d.innerHTML = '<span class="tt num"></span><span class="tp num"></span><span class="tq num"></span>';
+      d.style.display = 'none';
+      box.appendChild(d);
+      tapePool.push({ el: d, tt: d.children[0], tp: d.children[1], tq: d.children[2] });
     }
-    $('tapeList').innerHTML = html || '<div class="empty">暂无成交</div>';
+    tapeEmpty = document.createElement('div');
+    tapeEmpty.className = 'empty';
+    tapeEmpty.textContent = '暂无成交';
+    tapeEmpty.style.display = 'none';
+    box.appendChild(tapeEmpty);
+  }
+  function renderTape(S) {
+    var st = S.stock, box = $('tapeList');
+    tapeEnsure(box);
+    var raw = (SG.engine && SG.engine.tapeOf) ? SG.engine.tapeOf(st) : (st.ticks || []);
+    var arr = raw.slice().reverse();
+    var open = !!S.tapeOpen;
+    var n = Math.min(arr.length, open ? TAPE_MAX : 5);
+    var btn = $('tapeMore');
+    if (btn) {
+      btn.style.display = '';
+      btn.textContent = open ? '收起' : ('展开全部 ' + arr.length + ' 笔');
+    }
+    if (tapeEmpty) tapeEmpty.style.display = arr.length ? 'none' : '';
+    for (var i = 0; i < TAPE_MAX; i++) {
+      var row = tapePool[i];
+      if (!row) break;
+      if (i >= n) { if (row.el.style.display !== 'none') row.el.style.display = 'none'; continue; }
+      var t = arr[i];
+      var time = U.minuteLabel(Math.min(239, t.m));
+      var px = (t.pc / 100).toFixed(2);
+      var qty = String(Math.max(1, Math.round(t.q / 100)));
+      var cls = 'tape-row' + (t.my ? ' mine' : '');
+      var side = t.side > 0 ? 'up' : 'down';
+      if (row.el.style.display === 'none') row.el.style.display = '';
+      if (row.cls !== cls) { row.cls = cls; row.el.className = cls; }
+      if (row.tt_v !== time) { row.tt_v = time; row.tt.textContent = time; }
+      if (row.tp_v !== px || row.tp_c !== side) {
+        row.tp_v = px; row.tp_c = side;
+        row.tp.textContent = px; row.tp.className = 'tp num ' + side;
+      }
+      if (row.tq_v !== qty || row.tq_c !== side) {
+        row.tq_v = qty; row.tq_c = side;
+        row.tq.textContent = qty; row.tq.className = 'tq num ' + side;
+      }
+    }
   }
 
   function renderBook(S) {
@@ -5448,6 +5498,8 @@ button,input,select,textarea,.row,.mrow,.wrow,.trow,.secrow{-webkit-user-select:
       if (bb.dataset && bb.dataset.btab) bb.className = bb.dataset.btab === tab ? 'on' : '';
     }
     var bookEl = $('book'), tapeEl = $('tapeList');
+    var tgl = $('tapeMore');
+    if (tgl) tgl.style.display = tab === 'tape' ? '' : 'none';
     if (bookEl) bookEl.style.display = tab === 'tape' ? 'none' : '';
     if (tapeEl) tapeEl.style.display = tab === 'tape' ? '' : 'none';
     if (tab === 'tape') { renderTape(S); $('bookMeta').innerHTML = '<span class="dim">' + U.fmtVol(st.day.v) + '</span>'; return; }
@@ -5647,7 +5699,7 @@ button,input,select,textarea,.row,.mrow,.wrow,.trow,.secrow{-webkit-user-select:
     var m = S.m;
     if (m.newsSeq === lastNews) return;
     lastNews = m.newsSeq;
-    var html = '', arr = m.news.slice(0, 60);
+    var html = '', arr = m.news.slice(0, 24);
     for (var i = 0; i < arr.length; i++) {
       var it = arr[i];
       var scope = it.scope === 'macro' ? '大盘' : it.scope === 'market' ? '市场' :
@@ -5665,17 +5717,42 @@ button,input,select,textarea,.row,.mrow,.wrow,.trow,.secrow{-webkit-user-select:
   }
 
   /* ============================ 区块 G：入口 ============================ */
-  function render(S) {
+  var RAF = (typeof requestAnimationFrame === 'function') ? requestAnimationFrame
+    : function (f) { return setTimeout(f, 16); };
+  var restPending = false;
+
+  /* 重活（板块条 / 自选列表 / 消息 / 分时重绘）挪到下一帧：
+     点股票时先把报价、盘口、下单这些“眼睛要看的”同步画出来，页面立刻响应。 */
+  function renderRest(S) {
     renderChips(S);
     renderList(S);
+    renderNews(S);
+    SG.chart.set(S.stock, S.tf, S.m);
+  }
+  function scheduleRest() {
+    if (restPending) return;
+    restPending = true;
+    /* rAF 保证先把「报价/盘口/下单」这屏画出去，setTimeout 再干重活（列表、消息、分时重绘），
+       这样点股票时第一帧只有几毫秒，图表晚一帧出现但手感是立刻的。 */
+    RAF(function () {
+      setTimeout(function () {
+        restPending = false;
+        var S2 = SG.state.S;
+        if (!S2 || S2.page !== 'stock') return;
+        renderRest(S2);
+      }, 0);
+    });
+  }
+
+  function render(S) {
+    /* 关键区：同步画，保证一帧内看到新价格与新盘口 */
     renderQuote(S);
     renderLegend(S);
     renderBook(S);
     renderAcct(S);
     renderOrder(S);
     renderPos(S);
-    renderNews(S);
-    SG.chart.set(S.stock, S.tf, S.m);
+    scheduleRest();
   }
 
   function init() {
@@ -5704,14 +5781,21 @@ button,input,select,textarea,.row,.mrow,.wrow,.trow,.secrow{-webkit-user-select:
       SG.state.S.bookTab = b.dataset.btab;
       render(SG.state.S);
     });
+    var tm = $('tapeMore');
+    if (tm) tm.addEventListener('click', function (e) {
+      e.stopPropagation();
+      var S = SG.state.S;
+      S.tapeOpen = !S.tapeOpen;
+      renderTape(S);
+      renderBook(S);
+    });
   }
 
   SG.router.register('stock', {
     render: render,
     init: init,
-    onShow: function (S) {
-      // 刚切回来时画布可能还是 0 尺寸，resize 会重新量；尺寸没变就直接跳过重绘
-      SG.chart.set(S.stock, S.tf, S.m);
+    onShow: function () {
+      // 图表重绘统一由 render 的下一帧调度（避免一次点击画两遍）
     }
   });
   if (typeof module !== 'undefined' && module.exports) module.exports = SG;

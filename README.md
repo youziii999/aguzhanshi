@@ -381,4 +381,24 @@ stock-game/
 
 ### 顺带修
 `page-stock.js` 盘口固定五行后，「我 N手」标记仍只落在有挂单的档位；`secModal` 头部换成「数值一行 + 说明一行」自动换行，指数说明再长也不会把标题挤歪。
+---
 
+## 二十、v4.5 改了什么（科创指数 / ±100 按钮 / 改名）
+
+| 需求 | 做法 | 位置 |
+| --- | --- | --- |
+| 数量框左右加号减号 | 个股页与交易页的数量框都换成 `− / 输入 / +` 三段式：`<button class="qbtn" data-qd="-100">`，点击一次改 100 股，下限 100、且自动向上取整到手 | `index.html`、`js/app.js` `bind`、`js/page-trade.js` `init`、`css/styles.css` `15` |
+| 权重指数改名科创指数 | `idx3()` 里 lg 的名称改成「科创指数」，顶栏、指数卡、弹窗标题同步 | `js/ui-common.js` |
+| 科创票 ±20% 涨跌停 | `newStock` 与 `openDay` 两处限价都改成 `(board==='gem' || star) ? 1.2 : 1.1`（跌停 0.8/0.9） | `js/engine.js` |
+| 科创票需要 50 万才能买 | `doTrade()` 在买入前判断 `st.star && totalAssets() < 500000` → 弹「科创板权限不足」窗口（写明当前总资产和还差多少），卖出/撤单/看行情不受影响；`gateStar(st)` 负责填内容 | `js/state.js`、`js/ui-common.js`、`index.html` `#starModal` |
+| 科创票必须是板块龙头，一半科创一半主板 | `assignTiers(m)` 重写：每板块按流通市值取前 2 名标 `leader`（36 只）；每板块只挑 1 只进科创（优先 688 代码，否则哈希定），共 18 只 —— 18 个板块各 1 只，另一半 18 只龙头留在主板；中盘 = 非科创按市值取 130 只；`tierN = {lg:18, md:130, sm:176, star:18}` | `js/engine.js` `assignTiers` |
+| 左上角改名 | 标题、顶栏 brand、PWA 名称改成「大A？简单！」（SIM 与版本徽标保留） | `index.html` |
+
+### 科创标签的落点
+个股页标题旁、行情列表、自选列表、榜单、板块弹窗、指数成分弹窗里的股票名后面都会带一个金色「科创」小标签（`starTag(st)`），点开科创指数能看到 18 只、全部带标签。
+
+### 验证
+`node test/struct.js`、`node test/dom-smoke.js`（含 `SG_SINGLE=1`）、`node test/play.js`、`node test/load.js`、`node test/cal3.js` 全绿；DOM 冒烟里买入测试已改选非科创票（10 万资产会被 50 万门槛拦住，属预期）。
+
+### 截图
+`shots/v45-market.png`（顶栏 科创 / 科创指数卡）、`shots/v45-star.png`（科创标签 + ±20% + 数量框 ±）、`shots/v45-gate.png`（权限不足弹窗）、`shots/v45-idx.png`（科创指数 18 只成分）、`shots/v45-star-390.png` / `shots/v45-gate-390.png`（手机）。

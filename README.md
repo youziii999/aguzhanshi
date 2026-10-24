@@ -360,4 +360,25 @@ stock-game/
 
 ### 取舍记录
 `MICRO=2 + MAX_ORDERS_PER_STEP=18` 能把单步再降到 6.00ms（vs 7.08），但会改变行情轨迹（成交倍率、涨停数都变），只值 15%，**不采用**，保持 `MICRO=3 / 26 单 / 8 档`。`content-visibility:auto` 实测无收益，已在 v4.2 放弃。
+---
+
+## 十九、v4.4 改了什么（指数成分股 / 涨停五档 / 交易页迷你分时 / 加速更顺）
+
+| 需求 | 做法 | 位置 |
+| --- | --- | --- |
+| 科创进权重、更多票进中盘 | 新增 `capOf(st)` + `assignTiers(m)`：按流通市值排序，先给前 40 只 `lg`，科创（688）不足 8 只就从 688 里按市值补，再按市值把 `lg` 补到 60 只，剩下 130 只 `md`（中盘流通市值 109 亿~1060 亿） | `js/engine.js` `createMarket` |
+| 三个指数点开看成分股 | 指数卡加 `data-idx=sh/lg/md`，点开复用 `#secModal`；`indexMembers(m,key)` 返回成分（上证 324 只 = 全市场，权重 60，中盘 130），弹窗头部显示点位/涨跌/只数/上涨下跌/科创创业/成交额 | `js/page-market.js` `openIdx/rowsHtml`、`js/engine.js` `indexMembers` |
+| 涨停要有五档 | `buildBook()` 封板分支从「只推一档」改成整本五档：买一 = 封单量，买二~买五按封单量递减（系数 `0.26/i`，抖动 ±30%），卖盘为空；跌停对称。页面固定渲染 5 行，缺档画「—」占位 | `js/engine.js:181`、`js/page-stock.js` `renderBook`、`js/page-trade.js` `renderQuote`、`css/styles.css` `.lvl.empty/.tbrow.empty` |
+| 交易页小分时 | 下单卡下面新增「分时走势」卡：价格线 + 均价线 + 昨收虚线 + 底部量柱 + 时间刻度，`boxSize` 取尺寸、签名缓存不重复绘 | `index.html` `.tr-mini`、`js/page-trade.js` `renderMini` |
+| 加速卡顿 | `advance()` 单帧预算按倍速收窄（≥15× 45→30ms、≥30× 26ms，单帧步数上限 40→27→20）；高倍速（≥30×）把重绘压到 ~8fps，行情照跑、只少画几次 | `js/app.js` `advance` |
+
+### 实测（CDP `Performance.getMetrics`，1440×900，默认 1 小时/天）
+| 场景 | ScriptDuration /15s | LayoutDuration | LayoutCount | TaskDuration |
+| --- | --- | --- | --- | --- |
+| 行情页 60× | 0.62~0.85s | 0.39~0.46s | 56 | 1.35~1.79s（与 v4.3 持平） |
+| 交易页 60×（含迷你分时） | 0.73s | 0.11s | 56 | **1.02s** |
+| 交易页 60× + 25 分钟/天（约 9.6 步/秒，最重） | 1.85s | 0.22s | 96 | 2.40s（主线程约 16%） |
+
+### 顺带修
+`page-stock.js` 盘口固定五行后，「我 N手」标记仍只落在有挂单的档位；`secModal` 头部换成「数值一行 + 说明一行」自动换行，指数说明再长也不会把标题挤歪。
 

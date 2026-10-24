@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-<!-- 重生之我是股神 · 单文件版 v4.8 · 构建于 2026-10-24 14:07 · 源码见 stock-game/ -->
+<!-- 重生之我是股神 · 单文件版 v4.9 · 构建于 2026-10-24 14:30 · 源码见 stock-game/ -->
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0b0e13">
@@ -1080,6 +1080,34 @@ button,input,select,textarea,.row,.mrow,.wrow,.trow,.secrow{-webkit-user-select:
   .ctlbtn{font-size:13.5px;padding:9px 11px}
 }
 
+/* ============================================================
+   §18 v4.9：板块/榜单收起展开 + 弹窗加自选 + 手机个股页全域滑动
+   ============================================================ */
+/* 卡片头右侧的小开关（展开全部 / 收起） */
+.sgtoggle{font-size:11px;padding:3px 9px;border-radius:7px;line-height:1.2;white-space:nowrap}
+.sgtoggle.on{color:var(--accent);border-color:var(--accent)}
+
+/* 指数 / 板块弹窗：每行末尾的 ☆ 加自选 */
+.secrow{grid-template-columns:minmax(0,1fr) auto 28px}
+.sstar{
+  width:26px;height:26px;padding:0;border:0;border-radius:7px;background:none;
+  color:var(--dim2);font-size:16px;line-height:1;cursor:pointer;
+  display:inline-flex;align-items:center;justify-content:center;
+  touch-action:manipulation;
+}
+.sstar.on{color:var(--accent)}
+.sstar:active{background:rgba(255,255,255,.08);filter:brightness(1.2)}
+@media (max-width:760px){
+  .seccard .card-hd .dim,.rankcard .card-hd .dim{display:none}   /* 手机：说明字让位给展开按钮 */
+  .sstar{width:32px;height:32px;font-size:17px}
+  .secrow{grid-template-columns:minmax(0,1fr) auto 32px;gap:6px}
+  /* 个股页：五档 / 持仓 / 消息这些内部面板不再自己滚，手指落在哪儿都是滚整页 */
+  .page[data-page="stock"] .panel-bd{max-height:none!important;overflow:visible!important;overscroll-behavior:auto}
+  .page[data-page="stock"] .right{overflow:visible!important;overscroll-behavior:auto}
+  .page[data-page="stock"]{overscroll-behavior:auto;-webkit-overflow-scrolling:touch}
+  .page[data-page="stock"] #panelPos .panel-bd,
+  .page[data-page="stock"] #panelNews .panel-bd{max-height:none!important}
+}
 </style>
 </head>
 <body data-page="market">
@@ -1089,7 +1117,7 @@ button,input,select,textarea,.row,.mrow,.wrow,.trow,.secrow{-webkit-user-select:
        顶栏 —— 全站共享：三条指数 / 涨跌家数 / 时钟 / 倍速
        ============================================================ -->
   <header class="topbar">
-    <div class="brand"><span class="dot"></span>大A？简单！<small>SIM</small><i class="ver" id="appVer">v4.8</i></div>
+    <div class="brand"><span class="dot"></span>大A？简单！<small>SIM</small><i class="ver" id="appVer">v4.9</i></div>
     <div class="idxbox">
       <span class="nm">上证</span>
       <span class="v num" id="idxV">3000.00</span>
@@ -1202,13 +1230,13 @@ button,input,select,textarea,.row,.mrow,.wrow,.trow,.secrow{-webkit-user-select:
 
       <!-- 板块热力图 -->
       <section class="card seccard">
-        <div class="card-hd"><b>板块热力</b><span class="dim">点板块看成分股</span></div>
+        <div class="card-hd"><b>板块热力</b><span class="dim">点板块看成分股</span><button class="mini sgtoggle" id="mkSecToggle">展开</button></div>
         <div class="heat" id="mkSecGrid"></div>
       </section>
 
       <!-- 今日榜单 -->
       <section class="card rankcard">
-        <div class="card-hd"><b>今日榜单</b><span class="dim">实时</span></div>
+        <div class="card-hd"><b>今日榜单</b><span class="dim">实时</span><button class="mini sgtoggle" id="mkRankToggle">展开</button></div>
         <div class="rank-tabs" id="mkRankTabs"></div>
         <div class="rank-list" id="mkRank"></div>
       </section>
@@ -4875,11 +4903,26 @@ button,input,select,textarea,.row,.mrow,.wrow,.trow,.secrow{-webkit-user-select:
   }
 
   /* ============================ 区块 E：板块热力 ============================ */
+  var heatOpen = false, rankOpen = false;      // 板块热力 / 今日榜单：默认先收起，点了再展开
+  var RANK_PREVIEW = 6;
+  function narrow() { return typeof window !== 'undefined' && window.innerWidth && window.innerWidth < 760; }
+  function heatPreview() { return narrow() ? 5 : 9; }   // 手机两列显示，收起时先给 3 行
+
   function renderHeat(S) {
     var box = $('mkSecGrid');
     var list = C.sectors(S);
     var items = [{ id: 'all', name: '全部', chg: null, amt: 0, count: S.m.stocks.length }].concat(list);
-    var html = items.map(function (s) {
+    var HP = heatPreview();
+    var show = heatOpen ? items : items.slice(0, HP + 1);
+    /* 当前筛选的板块如果被收起了，就把它换进来，别让高亮消失 */
+    if (!heatOpen && S.filter && S.filter !== 'all') {
+      var picked = null, k;
+      for (k = 0; k < items.length; k++) if (items[k].id === S.filter) picked = items[k];
+      var has = false;
+      for (k = 0; k < show.length; k++) if (show[k].id === S.filter) has = true;
+      if (picked && !has) show = show.slice(0, HP).concat([picked]);
+    }
+    var html = show.map(function (s) {
       var on = (S.filter || 'all') === s.id ? ' on' : '';
       if (s.id === 'all') {
         return '<button class="hc all' + on + '" data-sec="all"><b>全部</b>' +
@@ -4892,6 +4935,12 @@ button,input,select,textarea,.row,.mrow,.wrow,.trow,.secrow{-webkit-user-select:
         '<span class="dim">' + U.fmtMoney(s.amt) + '</span></button>';
     }).join('');
     if (box.dataset.html !== html) { box.innerHTML = html; box.dataset.html = html; }
+    var tg = $('mkSecToggle');
+    if (tg) {
+      var txt = heatOpen ? '收起' : (narrow() ? '展开 ' + (items.length - 1) : '展开全部 ' + (items.length - 1) + ' 个');
+      if (tg.textContent !== txt) tg.textContent = txt;
+      tg.className = 'mini sgtoggle' + (heatOpen ? ' on' : '');
+    }
   }
 
   /* ============================ 区块 E2：板块成分股弹窗 ============================ */
@@ -4905,11 +4954,14 @@ button,input,select,textarea,.row,.mrow,.wrow,.trow,.secrow{-webkit-user-select:
   function rowsHtml(arr) {
     return arr.map(function (st) {
       var p2 = pctOf(st);
+      var w = SG.state.isWatched ? SG.state.isWatched(st.code) : false;
       return '<div class="secrow" data-code="' + st.code + '">' +
         '<div class="sl"><b>' + st.name + SG.uiCommon.starTag(st) + '</b><i class="dim">' + st.code + ' · ' + secName(st.sector) + '</i></div>' +
         '<div class="sr"><b class="num ' + U.cls(p2) + '">' + (st.pc / 100).toFixed(2) + '</b>' +
         '<i class="num ' + U.cls(p2) + '">' + U.fmtPct(p2) + '</i>' +
-        '<span class="num dim">' + U.fmtMoney(st.day.amt) + '</span></div></div>';
+        '<span class="num dim">' + U.fmtMoney(st.day.amt) + '</span></div>' +
+        '<button class="sstar' + (w ? ' on' : '') + '" data-star="' + st.code + '" aria-label="加自选">' +
+        (w ? '★' : '☆') + '</button></div>';
     }).join('');
   }
 
@@ -5031,7 +5083,8 @@ button,input,select,textarea,.row,.mrow,.wrow,.trow,.secrow{-webkit-user-select:
     Array.prototype.forEach.call(tabs.children, function (b) {
       b.className = b.dataset.rank === S.rankTab ? 'on' : '';
     });
-    var rows = rankRows(S, S.rankTab || 'up');
+    var allRows = rankRows(S, S.rankTab || 'up');
+    var rows = rankOpen ? allRows : allRows.slice(0, RANK_PREVIEW);
     var html = rows.map(function (r, i) {
       return '<div class="rankrow' + (r.code ? ' clk' : '') + '"' + (r.code ? ' data-code="' + r.code + '"' : '') + '>' +
         '<i class="rno' + (i < 3 ? ' top' + (i + 1) : '') + '">' + (r.tag ? r.tag : (i + 1)) + '</i>' +
@@ -5041,6 +5094,16 @@ button,input,select,textarea,.row,.mrow,.wrow,.trow,.secrow{-webkit-user-select:
     }).join('');
     var box = $('mkRank');
     if (box.dataset.html !== html) { box.innerHTML = html; box.dataset.html = html; }
+    var tg = $('mkRankToggle');
+    if (tg) {
+      if (allRows.length <= RANK_PREVIEW) { tg.style.display = 'none'; }
+      else {
+        tg.style.display = '';
+        var txt = rankOpen ? '收起' : (narrow() ? '展开 ' + allRows.length : '展开全部 ' + allRows.length + ' 条');
+        if (tg.textContent !== txt) tg.textContent = txt;
+        tg.className = 'mini sgtoggle' + (rankOpen ? ' on' : '');
+      }
+    }
   }
 
   /* ============================ 区块 G：全市场列表 ============================ */
@@ -5120,6 +5183,18 @@ button,input,select,textarea,.row,.mrow,.wrow,.trow,.secrow{-webkit-user-select:
   }
 
   function init() {
+    var ht = $('mkSecToggle');
+    if (ht) ht.addEventListener('click', function (e) {
+      e.stopPropagation();
+      heatOpen = !heatOpen;
+      renderHeat(SG.state.S);
+    });
+    var rt = $('mkRankToggle');
+    if (rt) rt.addEventListener('click', function (e) {
+      e.stopPropagation();
+      rankOpen = !rankOpen;
+      renderRank(SG.state.S);
+    });
     var tabs = $('mkRankTabs');
     if (tabs) tabs.addEventListener('click', function (e) {
       var b = e.target.closest('[data-rank]');
@@ -5150,6 +5225,18 @@ button,input,select,textarea,.row,.mrow,.wrow,.trow,.secrow{-webkit-user-select:
     if (sm) {
       sm.addEventListener('click', function (e) {
         if (e.target === sm || e.target.id === 'secClose') { closeSec(); return; }
+        /* 行尾的 ☆：加/取消自选，别把点击当成「打开这只票」 */
+        var sb = e.target.closest('[data-star]');
+        if (sb) {
+          e.stopPropagation();
+          var c = sb.dataset.star;
+          var on = SG.state.toggleWatch(c);
+          sb.textContent = on ? '★' : '☆';
+          sb.className = 'sstar' + (on ? ' on' : '');
+          var st0 = SG.state.S.m.stockByCode[c];
+          SG.uiCommon.toast(on ? '已加自选：' + (st0 ? st0.name : c) : '已从自选移除：' + (st0 ? st0.name : c), 'ok');
+          return;
+        }
         var row = e.target.closest('[data-code]');
         if (row) {
           closeSec();
@@ -5978,13 +6065,15 @@ button,input,select,textarea,.row,.mrow,.wrow,.trow,.secrow{-webkit-user-select:
     });
   }
 
-  SG.router.register('stock', {
+  var pageStock = {
     render: render,
     init: init,
     onShow: function () {
       // 图表重绘统一由 render 的下一帧调度（避免一次点击画两遍）
     }
-  });
+  };
+  SG.pageStock = pageStock;              // 供 app.js 开局预热整页（见 warmStock）
+  SG.router.register('stock', pageStock);
   if (typeof module !== 'undefined' && module.exports) module.exports = SG;
 })(typeof globalThis !== 'undefined' ? globalThis : this);
 </script>
@@ -6888,6 +6977,8 @@ button,input,select,textarea,.row,.mrow,.wrow,.trow,.secrow{-webkit-user-select:
     if (!s.m) return;
     s.stock = s.m.stockByCode[s.sel] || s.m.stocks[0];
     s.sel = s.stock.code;
+    /* 预热个股页时先别刷（否则正在看的行情页会被切走一帧） */
+    if (s.warming) { s.dirty = true; return; }
     /* 页面切到后台就不用刷了（省电、也不占主线程），回来时补一次 */
     if (typeof document !== 'undefined' && document.hidden) { s.dirty = true; return; }
     s.dirty = false;
@@ -7238,6 +7329,40 @@ button,input,select,textarea,.row,.mrow,.wrow,.trow,.secrow{-webkit-user-select:
       SG.uiCommon.toast('已重开：启动资金 ' + (s.startCash / 10000).toFixed(1) + ' 万' + (keep ? '，全新行情' : ''), 'ok');
     });
   }
+  /* ============================ 区块 D2：个股页预热 ============================ */
+  /* 第一次从行情页点进个股页时，浏览器要现算一整页的布局和首次画布绘制，手机上会有明显停顿。
+     这里在屏幕外按「真实尺寸」把个股页完整渲染一遍（文字、盘口、自选列表、分时图都出来），
+     再切回行情页。之后真正点进去只剩显示/隐藏的切换，实测首次进入 280ms → 50ms 左右。 */
+  var warmed = false;
+  function warmStock() {
+    var s = st();
+    if (warmed || s.warming || !s.m || !s.m.stocks || !s.m.stocks.length) return;
+    if (s.page === 'stock') return;                       // 深链本来就在个股页，不用预热
+    var sc = document.querySelector('.page[data-page="stock"]');
+    var mp = document.querySelector('.page[data-page="market"]');
+    if (!sc || !mp) return;
+    var r = mp.getBoundingClientRect ? mp.getBoundingClientRect() : null;
+    var w = r && r.width, h = r && r.height;
+    if (!w || !h || w < 200) return;                      // 尺寸还没算出来，等下次刷新
+    warmed = true;
+    var prevPage = s.page, prevSel = s.sel, prevStock = s.stock;
+    var code = s.m.stockByCode[prevSel] ? prevSel : (s.m.stocks[0] && s.m.stocks[0].code);
+    s.warming = true;
+    s.page = 'stock';
+    if (code) { s.sel = code; s.stock = s.m.stockByCode[code] || s.stock; }
+    sc.classList.add('on');
+    sc.style.cssText = 'position:fixed;left:-200vw;top:0;width:' + Math.round(w) + 'px;height:' + Math.round(h) +
+      'px;visibility:hidden;display:flex;z-index:-1;pointer-events:none;';
+    try { SG.pageStock.render(s); } catch (e) { /* 预热失败也不影响开局 */ }
+    setTimeout(function () {
+      s.page = prevPage; s.sel = prevSel; s.stock = prevStock;
+      sc.classList.remove('on');
+      sc.style.cssText = '';
+      s.warming = false;
+      try { refresh(); } catch (e2) {}
+    }, 300);
+  }
+
   /* ============================ 区块 E：启动 ============================ */
   function loadingMask(on, txt) {
     var el = document.getElementById('bootMask');
@@ -7340,6 +7465,7 @@ button,input,select,textarea,.row,.mrow,.wrow,.trow,.secrow{-webkit-user-select:
     if (saved) SG.uiCommon.toast('已读取存档：第 ' + s.m.day + ' 天 ' + U.minuteLabel(Math.min(239, s.m.minute)), 'ok');
     if (!s.speed) syncSpeed();
     schedule();
+    setTimeout(warmStock, 120);          // 开局后在屏幕外预热个股页，点进去更快
     // 首次进入弹「选启动资金」；截图/调试可用 #skipstart=1 跳过
     if (!saved) {
       if (/skipstart/.test(hs)) { s.started = true; s.speed = 0; syncSpeed(); }
